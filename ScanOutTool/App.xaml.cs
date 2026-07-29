@@ -11,8 +11,6 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using ScanOutTool.Services;
-using ScanOutLogLib.Helpers;
-using ScanOutLogLib.Interfaces;
 using ScanOutLogLib.Services;
 using ScanOutTool.Views;
 
@@ -93,7 +91,7 @@ namespace ScanOutTool
 
             AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
             {
-                MessageBox.Show($"Lỗi không xử lý: {sender}\r\n" + args.ExceptionObject);
+                MessageBox.Show(Current.MainWindow, $"Lỗi không xử lý: {sender}\r\n" + args.ExceptionObject);
             };
 
             
@@ -128,14 +126,14 @@ namespace ScanOutTool
             services.AddSingleton<Services.IUpdateService, Services.UpdateService>();
             services.AddSingleton<Services.IConfigService, Services.ConfigService>();
             services.AddSingleton<Models.IAppState, Models.AppState>();
-            services.AddSingleton<IPLCServiceFactory, PLCServiceFactory>();
             services.AddSingleton<IBlockRFService, BlockRFService>();
+            services.AddSingleton<IAudioNotificationService, AudioNotificationService>();
+            services.AddSingleton<IShopFloorService, ShopFloorService>();
+            services.AddSingleton<IScanDataService, ScanDataService>();
             //services.AddSingleton<IShowRescanResultService, ShowRescanResultService>();
             //services.AddSingleton<IAutoScanOutUI, AutoScanOutUI>();
 
 
-            services.AddSingleton<IScanResultDispatcher, ScanResultDispatcher>();
-            services.AddSingleton<IScanResultAwaiter, ScanResultAwaiter>();
             services.AddSingleton<IScanResultService, ScanResultService>();
 
             // Views

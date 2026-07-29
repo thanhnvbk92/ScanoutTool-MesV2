@@ -5,17 +5,15 @@ VisualStudioVersion = 17.11.35312.102
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ScanOutTool", "ScanOutTool\ScanOutTool.csproj", "{AE086DC6-8746-4CF7-B9EB-056FEE8186C8}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AutoUpdate", "..\..\Project .NET Framework\Library\AutoUpdate\AutoUpdate\AutoUpdate.csproj", "{85359739-16C1-4F47-A309-9A3DFFF2EF4B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AutoUpdate", "Lib\AutoUpdate\AutoUpdate\AutoUpdate.csproj", "{85359739-16C1-4F47-A309-9A3DFFF2EF4B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UIAutoLib", "..\Library\UIAutoLib\UIAutoLib\UIAutoLib.csproj", "{4B6E552F-115B-4012-A726-695F7F65373C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UIAutoLib", "Lib\UIAutoLib\UIAutoLib\UIAutoLib.csproj", "{4B6E552F-115B-4012-A726-695F7F65373C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MitsubishiAsciiPlcLib", "..\Library\MitsubishiAsciiPlcClient\MitsubishiAsciiPlcClient\MitsubishiAsciiPlcLib.csproj", "{8F9422D8-2462-4C7A-87C2-C45905738CD7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SerialPortProxy", "Lib\SerialPortProxy\SerialPortProxy\SerialPortProxy.csproj", "{BC9E661E-2412-424E-9D19-EE678CAE5B62}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SerialPortProxy", "..\Library\SerialPortProxy\SerialPortProxy\SerialPortProxy.csproj", "{BC9E661E-2412-424E-9D19-EE678CAE5B62}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataExcuter", "Lib\ScanOutRev\DataExcuter\DataExcuter.csproj", "{258C7D38-336F-4120-99BF-0BB11A5DBD5F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataExcuter", "..\ScanOutRev\DataExcuter\DataExcuter.csproj", "{258C7D38-336F-4120-99BF-0BB11A5DBD5F}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScanOutLogLib", "..\Library\ScanOutLogLib\ScanOutLogLib.csproj", "{4BBF6E4C-65B2-4540-B3E5-D35189DA0B8D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScanOutLogLib", "Lib\ScanOutLogLib\ScanOutLogLib.csproj", "{4BBF6E4C-65B2-4540-B3E5-D35189DA0B8D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,10 +33,6 @@ Global
 		{4B6E552F-115B-4012-A726-695F7F65373C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4B6E552F-115B-4012-A726-695F7F65373C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4B6E552F-115B-4012-A726-695F7F65373C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8F9422D8-2462-4C7A-87C2-C45905738CD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8F9422D8-2462-4C7A-87C2-C45905738CD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8F9422D8-2462-4C7A-87C2-C45905738CD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8F9422D8-2462-4C7A-87C2-C45905738CD7}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BC9E661E-2412-424E-9D19-EE678CAE5B62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BC9E661E-2412-424E-9D19-EE678CAE5B62}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BC9E661E-2412-424E-9D19-EE678CAE5B62}.Release|Any CPU.ActiveCfg = Release|Any CPU

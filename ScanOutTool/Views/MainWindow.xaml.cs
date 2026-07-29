@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using ScanOutTool.Services;
 using ScanOutTool.ViewModels;
+using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Navigation;
@@ -39,9 +40,25 @@ namespace ScanOutTool.Views
                 WindowState = WindowState.Maximized;
         }
 
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            ApplyMaximizedWorkAreaBounds();
+        }
+
+        private void Window_StateChanged(object sender, EventArgs e)
+        {
+            ApplyMaximizedWorkAreaBounds();
+        }
+
+        private void ApplyMaximizedWorkAreaBounds()
+        {
+            MaxWidth = SystemParameters.WorkArea.Width;
+            MaxHeight = SystemParameters.WorkArea.Height;
+        }
+
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            var result = MessageBox.Show("Bạn có muốn ẩn chương trình xuống khay hệ thống?",
+            var result = MessageBox.Show(this, "Bạn có muốn ẩn chương trình xuống khay hệ thống?",
                                          "Xác nhận", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
             if (result == MessageBoxResult.No)

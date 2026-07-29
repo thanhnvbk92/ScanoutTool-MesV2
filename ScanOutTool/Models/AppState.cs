@@ -12,13 +12,8 @@ namespace ScanOutTool.Models
         bool IsRunning { get; set; }
     }
 
-    public class AppState : ObservableObject, IAppState
+    public partial class AppState : ObservableObject, IAppState
     {
-        private bool _isRunning;
-        public bool IsRunning
-        {
-            get => _isRunning;
-            set => SetProperty(ref _isRunning, value);
-        }
+        [ObservableProperty] private bool isRunning;
     }
 }

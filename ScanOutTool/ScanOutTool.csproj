@@ -5,7 +5,7 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>a185a700f6e189dac79b79ff7f30e160.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AssemblyVersion>1.0.2.9</AssemblyVersion>
+    <AssemblyVersion>1.0.4.4</AssemblyVersion>
     <PlatformTarget>AnyCPU</PlatformTarget>
 	  <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
@@ -26,7 +26,6 @@
     <PackageReference Include="HslCommunication" Version="12.3.1" />
     <PackageReference Include="MaterialDesignThemes" Version="5.2.1" />
     <PackageReference Include="MaterialDesignThemes.MahApps" Version="5.2.1" />
-    <PackageReference Include="McpX" Version="0.5.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.4" />
@@ -40,12 +39,11 @@
     <PackageReference Include="WindowsAPICodePack-Shell" Version="1.1.1" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Project .NET Framework\Library\AutoUpdate\AutoUpdate\AutoUpdate.csproj" />
-    <ProjectReference Include="..\..\Library\MitsubishiAsciiPlcClient\MitsubishiAsciiPlcClient\MitsubishiAsciiPlcLib.csproj" />
-    <ProjectReference Include="..\..\Library\ScanOutLogLib\ScanOutLogLib.csproj" />
-    <ProjectReference Include="..\..\Library\SerialPortProxy\SerialPortProxy\SerialPortProxy.csproj" />
-    <ProjectReference Include="..\..\Library\UIAutoLib\UIAutoLib\UIAutoLib.csproj" />
-    <ProjectReference Include="..\..\ScanOutRev\DataExcuter\DataExcuter.csproj" />
+    <ProjectReference Include="..\Lib\AutoUpdate\AutoUpdate\AutoUpdate.csproj" />
+    <ProjectReference Include="..\Lib\ScanOutLogLib\ScanOutLogLib.csproj" />
+    <ProjectReference Include="..\Lib\SerialPortProxy\SerialPortProxy\SerialPortProxy.csproj" />
+    <ProjectReference Include="..\Lib\UIAutoLib\UIAutoLib\UIAutoLib.csproj" />
+    <ProjectReference Include="..\Lib\ScanOutRev\DataExcuter\DataExcuter.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\AppIcon.ico" />

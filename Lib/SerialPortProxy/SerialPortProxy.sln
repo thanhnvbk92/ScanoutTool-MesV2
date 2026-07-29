@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35312.102
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SerialPortProxy", "SerialPortProxy\SerialPortProxy.csproj", "{16C665FD-9AE0-441C-96E4-0BCEA6E7114C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{16C665FD-9AE0-441C-96E4-0BCEA6E7114C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16C665FD-9AE0-441C-96E4-0BCEA6E7114C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16C665FD-9AE0-441C-96E4-0BCEA6E7114C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16C665FD-9AE0-441C-96E4-0BCEA6E7114C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1660CFE6-2FEE-487F-A98F-5991AEC6CC1E}
+	EndGlobalSection
+EndGlobal

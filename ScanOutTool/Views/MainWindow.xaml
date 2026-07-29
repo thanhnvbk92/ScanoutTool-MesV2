@@ -2,13 +2,26 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        xmlns:local="clr-namespace:ScanOutTool.Helpers.Converters"
+        xmlns:local="clr-namespace:ScanOutTool.Converters"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Modern WPF App"
         Height="600"
         Width="1000"
+        MinHeight="520"
+        MinWidth="900"
         WindowStyle="None"
-        AllowsTransparency="True"
-        Background="Transparent">
+        ResizeMode="CanResize"
+        AllowsTransparency="False"
+        Background="{DynamicResource MaterialDesignPaper}"
+        Loaded="Window_Loaded"
+        StateChanged="Window_StateChanged">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            ResizeBorderThickness="8"
+                            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
         <Style x:Key="TitleBarButtonStyle" TargetType="Button">
@@ -153,17 +166,9 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Theme Toggle -->
             <Border Grid.Row="1" BorderBrush="{DynamicResource MaterialDesignBody}" BorderThickness="0,0,0,1">
                 <DockPanel  Background="{DynamicResource MaterialDesignPaper}" Height="50">
                     <TextBlock Text="{Binding PageName}" VerticalAlignment="Bottom" Margin="10" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBody}" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10">
-                        <materialDesign:PackIcon Kind="WeatherSunny" Width="20" Height="20" Foreground="{DynamicResource MaterialDesignBody}" />
-                        <ToggleButton IsChecked="{Binding IsDarkTheme, Mode=TwoWay}" 
-                      Width="50" Height="30" Margin="5,0,5,0"
-                      Style="{StaticResource MaterialDesignSwitchToggleButton}" />
-                        <materialDesign:PackIcon Kind="WeatherNight" Width="20" Height="20" Foreground="{DynamicResource MaterialDesignBody}" />
-                    </StackPanel>
                 </DockPanel>
             </Border>
             

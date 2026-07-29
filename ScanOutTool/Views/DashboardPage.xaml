@@ -1,29 +1,316 @@
-﻿<Page x:Class="ScanOutTool.Views.DashboardPage"
+<Page x:Class="ScanOutTool.Views.DashboardPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-      Title="Dashboard">
-    <Grid>
+      Title="Dashboard"
+      Background="{DynamicResource MaterialDesignPaper}">
+    <Page.Resources>
+        <Style x:Key="SurfaceStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource MaterialDesignBackground}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="18"/>
+            <Setter Property="Margin" Value="6"/>
+        </Style>
+
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="CaptionStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBodyLight}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+        </Style>
+
+        <Style x:Key="ValueStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+
+        <Style x:Key="CompactValueStyle" TargetType="TextBlock" BasedOn="{StaticResource ValueStyle}">
+            <Setter Property="FontSize" Value="15"/>
+        </Style>
+
+        <Style x:Key="LargeResultStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+            <Setter Property="FontSize" Value="110"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Result}" Value="OK">
+                    <Setter Property="Foreground" Value="#39D353"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Result}" Value="NG">
+                    <Setter Property="Foreground" Value="#FF4D4D"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="HmesResultStyle" TargetType="TextBlock" BasedOn="{StaticResource ValueStyle}">
+            <Setter Property="FontSize" Value="36"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HmesResult}" Value="OK">
+                    <Setter Property="Foreground" Value="#39D353"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HmesResult}" Value="NG">
+                    <Setter Property="Foreground" Value="#FF4D4D"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ReadOnlyBoxStyle" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignOutlinedTextBox}">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalContentAlignment" Value="Top"/>
+            <Setter Property="Padding" Value="10"/>
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="1.15*"/>
+            <RowDefinition Height="0.85*"/>
         </Grid.RowDefinitions>
-        <StackPanel Orientation="Horizontal">
-            <TextBox Text="{Binding PID}" materialDesign:HintAssist.Hint="PID" Foreground="{DynamicResource MaterialDesignBody}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" IsReadOnly="True" Width="100" Margin="5,0,0,0"/>
-            <TextBox Text="{Binding PartNo}" materialDesign:HintAssist.Hint="Part No" Foreground="{DynamicResource MaterialDesignBody}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" IsReadOnly="True" Width="100"  Margin="5,0,0,0"/>
-            <TextBox Text="{Binding WorkOrder}" materialDesign:HintAssist.Hint="Work Order" Foreground="{DynamicResource MaterialDesignBody}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" IsReadOnly="True" Width="100"  Margin="5,0,0,0"/>
-            <TextBox Text="{Binding Result}" materialDesign:HintAssist.Hint="Result" Foreground="{DynamicResource MaterialDesignBody}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" IsReadOnly="True" Width="40"  Margin="5,0,0,0"/>
-            <TextBox Text="{Binding PCBLocation}" materialDesign:HintAssist.Hint="PCB Location" Foreground="{DynamicResource MaterialDesignBody}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" IsReadOnly="True" Width="70"  Margin="5,0,0,0"/>
-            <TextBox Text="{Binding SelectedEBR}" materialDesign:HintAssist.Hint="EBR được chọn" Foreground="{DynamicResource MaterialDesignBody}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Width="100"  Margin="5,0,0,0"/>
-            <TextBox Text="{Binding MagazineQty}" materialDesign:HintAssist.Hint="Số lượng PCB" Foreground="{DynamicResource MaterialDesignBody}" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Width="100"  Margin="5,0,0,0"/>
-            <ComboBox SelectedItem="{Binding SelectedRunMode}" ItemsSource="{Binding RunModes}"  Width="120" VerticalAlignment="Bottom" Foreground="{DynamicResource MaterialDesignBody}" Margin="5,0,0,0"/>
-        </StackPanel>
-        <TextBox x:Name="LogTextBox" Grid.Row="1" Text="{Binding Logs}" TextWrapping="NoWrap" Foreground="{DynamicResource MaterialDesignBody}"  IsReadOnly="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Visible"  TextChanged="LogTextBox_TextChanged" VerticalContentAlignment="Top" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-            
-        <TextBlock Grid.Row="1" Text="{Binding InformationMessage}" Visibility="{Binding IsMessageOn, Converter={StaticResource BoolToVisibilityConverter}}" Background="Gray" Foreground="Yellow" FontSize="26" FontWeight="Bold" VerticalAlignment="Top" TextWrapping="Wrap"/>
-        <StackPanel Orientation="Horizontal" Grid.Row="2" FlowDirection="RightToLeft">
-            <Button Content="{Binding StartBtnText}" Command="{Binding StartCommand}" />
-        </StackPanel>
+
+        <Border Grid.Row="0" Style="{StaticResource SurfaceStyle}" Padding="14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0"
+                         Text="{Binding SelectedEBR}"
+                         Width="210"
+                         Foreground="{DynamicResource MaterialDesignBody}"
+                         Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                         materialDesign:HintAssist.Hint="Selected EBR/WO"
+                         Margin="0,0,14,0"/>
+
+                <ComboBox Grid.Column="1"
+                          SelectedItem="{Binding SelectedRunMode}"
+                          ItemsSource="{Binding RunModes}"
+                          Width="190"
+                          Foreground="{DynamicResource MaterialDesignBody}"
+                          Style="{StaticResource MaterialDesignFloatingHintComboBox}"
+                          materialDesign:HintAssist.Hint="Run Mode"/>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="HMES web runs normally. Dashboard shows ShopFloor and HMES data."
+                               Foreground="{DynamicResource MaterialDesignBodyLight}"
+                               FontSize="12"
+                               VerticalAlignment="Center"
+                               Margin="0,0,16,0"/>
+                    <Button Content="{Binding StartBtnText}"
+                            Command="{Binding StartCommand}"
+                            MinWidth="120"
+                            Height="42"
+                            FontWeight="SemiBold"
+                            IsEnabled="{Binding IsSessionStarting, Converter={StaticResource InverseBoolConverter}}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.18*"/>
+                <ColumnDefinition Width="0.82*"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource SurfaceStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="MonitorDashboard" Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="ShopFloor Data" Style="{StaticResource SectionTitleStyle}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Result}" Style="{StaticResource LargeResultStyle}"/>
+                        <StackPanel HorizontalAlignment="Center" Margin="0,-8,0,4">
+                            <TextBlock Text="Progress" Style="{StaticResource CaptionStyle}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding Progress}"
+                                       Foreground="{DynamicResource MaterialDesignBody}"
+                                       FontSize="34"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <UniformGrid Grid.Row="0" Columns="3" Rows="1" Margin="0,0,0,14">
+                            <StackPanel Margin="0,0,14,0">
+                                <TextBlock Text="PID" Style="{StaticResource CaptionStyle}"/>
+                                <TextBlock Text="{Binding PID}" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,14,0">
+                                <TextBlock Text="Part No" Style="{StaticResource CaptionStyle}"/>
+                                <TextBlock Text="{Binding PartNo}" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Work Order" Style="{StaticResource CaptionStyle}"/>
+                                <TextBlock Text="{Binding WorkOrder}" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <TextBox Grid.Row="1"
+                                 Text="{Binding ResultMessage}"
+                                 materialDesign:HintAssist.Hint="ShopFloor Message"
+                                 Style="{StaticResource ReadOnlyBoxStyle}"
+                                 MinHeight="72"/>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource SurfaceStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal">
+                            <materialDesign:PackIcon Kind="Web" Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="HMES Web Data" Style="{StaticResource SectionTitleStyle}"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Command="{Binding ManualPrintCommand}"
+                                Height="36"
+                                MinWidth="126"
+                                Padding="12,0">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Printer" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Text="Manual Print"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <Grid Grid.Row="1" Margin="0,16,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,18,0">
+                            <TextBlock Text="Result" Style="{StaticResource CaptionStyle}"/>
+                            <TextBlock Text="{Binding HmesResult}" Style="{StaticResource HmesResultStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Sending" Style="{StaticResource CaptionStyle}"/>
+                            <TextBlock Text="{Binding IsDataSending}" Style="{StaticResource CompactValueStyle}"/>
+                            <TextBlock Text="Run Mode" Style="{StaticResource CaptionStyle}" Margin="0,14,0,0"/>
+                            <TextBlock Text="{Binding SelectedRunMode}" Style="{StaticResource CompactValueStyle}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <UniformGrid Grid.Row="0" Columns="3" Rows="1" Margin="0,0,0,14">
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="Pack Qty" Style="{StaticResource CaptionStyle}"/>
+                                <TextBlock Text="{Binding HmesPackQty}" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,12,0">
+                                <TextBlock Text="Magazine QPM" Style="{StaticResource CaptionStyle}"/>
+                                <TextBlock Text="{Binding HmesMagazineQty}" Style="{StaticResource ValueStyle}"/>
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Magazine No" Style="{StaticResource CaptionStyle}"/>
+                                <TextBlock Text="{Binding HmesMagazineNo}" Style="{StaticResource CompactValueStyle}"/>
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <TextBox Grid.Row="1"
+                                 Text="{Binding HmesMessage}"
+                                 materialDesign:HintAssist.Hint="HMES Message"
+                                 Style="{StaticResource ReadOnlyBoxStyle}"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource SurfaceStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="FormatListBulleted" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="Logs" Style="{StaticResource SectionTitleStyle}"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Grid.Row="1">
+                    <TextBox x:Name="LogTextBox"
+                             Text="{Binding Logs}"
+                             TextWrapping="NoWrap"
+                             Foreground="{DynamicResource MaterialDesignBody}"
+                             FontFamily="Consolas"
+                             FontSize="12"
+                             IsReadOnly="True"
+                             BorderThickness="0"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Visible"
+                             TextChanged="LogTextBox_TextChanged"
+                             VerticalContentAlignment="Top"
+                             HorizontalAlignment="Stretch"
+                             VerticalAlignment="Stretch"/>
+                    <Border Visibility="{Binding IsMessageOn, Converter={StaticResource BoolToVisibilityConverter}}"
+                            Background="#EE333333"
+                            BorderBrush="#FFFFD000"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="16"
+                            VerticalAlignment="Top"
+                            Margin="10">
+                        <TextBlock Text="{Binding InformationMessage}"
+                                   Foreground="Yellow"
+                                   FontSize="22"
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"/>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </Page>

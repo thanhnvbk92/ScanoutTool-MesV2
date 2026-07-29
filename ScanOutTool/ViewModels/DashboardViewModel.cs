@@ -1,72 +1,53 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataExcuter;
-using ScanOutLogLib.Interfaces;
 using ScanOutLogLib.Services;
 using ScanOutTool.Models;
 using ScanOutTool.Services;
+using ScanOutTool.Utilities;
 using ScanOutTool.Views;
+using ScanOutTool.ViewModels.Controls;
 using SerialProxyLib;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
-using System.IO.Ports;
 using System.Linq;
-using System.Media;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Threading;
 
 namespace ScanOutTool.ViewModels
 {
     public partial class DashboardViewModel : ObservableObject
-    {        
-        public enum RunMode
+    {
+        private enum HmesBlockAction
         {
-            ScanOutOnly,
-            RescanOnly,
-            ScanOut_Rescan,
-            None
+            AllowFullFlow,
+            SkipWebAfterShopFloor,
+            StopBeforeShopFloor
         }
 
         private readonly IAppState _appState;
         private readonly ILoggingService _loggingService;
         private readonly IConfigService _configService;
-        private readonly IPLCServiceFactory _plcFactory;
         private readonly IScanResultService _resultService;
-        private readonly IScanResultDispatcher _dispatcher;
-        private readonly IShowRescanResultService _showRescanResultService;
         private readonly IBlockRFService _blockRFService;
+        private readonly IAudioNotificationService _audioNotificationService;
+        private readonly IShopFloorService _shopFloorService;
+        private readonly IScanDataService _scanDataService;
 
-        private IPLCService? _plcService;
-
-        private IAutoScanOutUI _autoScanOutUI;
         private SerialProxyManager _serialProxyManager;
-        private bool _isPLCConnected = false;
+        private readonly HashSet<string> _skipWebSendPids = new(StringComparer.OrdinalIgnoreCase);
 
         private bool IsScanOutOnly => SelectedRunMode == RunMode.ScanOutOnly;
         private bool IsRescanOnly => SelectedRunMode == RunMode.RescanOnly;
         private bool IsScanOutRescan => SelectedRunMode == RunMode.ScanOut_Rescan;
         private bool IsNone => SelectedRunMode == RunMode.None;
 
-        private bool _isStarted;
-        public bool IsStarted
-        {
-            get => _isStarted;
-            set
-            {
-                SetProperty(ref _isStarted, value);
-                StartBtnText = _isStarted ? "STOP" : "START";
-            }
-        }
-
-        private DataExecuter _dataExecuter;
         private Stopwatch mainSW = new Stopwatch();
 
+        [ObservableProperty] private bool isStarted;
         [ObservableProperty] private bool isSessionStarting;
+        [ObservableProperty] private bool isStartButtonVisible = true;
         [ObservableProperty] private bool isInChooseEBRMode=false;
         [ObservableProperty] private bool isPCBtoSelectEBR = false;
         [ObservableProperty] private bool isConfirmEBRStep = false;
@@ -77,14 +58,25 @@ namespace ScanOutTool.ViewModels
         [ObservableProperty] private string partNo;
         [ObservableProperty] private string workOrder;
         [ObservableProperty] private string result;
+        [ObservableProperty] private string progress;
         [ObservableProperty] private string resultMessage;
-        [ObservableProperty] private string pCBLocation;
         [ObservableProperty] private RunMode selectedRunMode;
         [ObservableProperty] private List<RunMode> runModes;
         [ObservableProperty] private string selectedEBR;
         [ObservableProperty] private string informationMessage;
         [ObservableProperty] private bool isMessageOn =false;
         [ObservableProperty] private int magazineQty;
+        [ObservableProperty] private string shopFloorExePath;
+        [ObservableProperty] private string hmesResult;
+        [ObservableProperty] private string hmesMessage;
+        [ObservableProperty] private int hmesPackQty;
+        [ObservableProperty] private int hmesMagazineQty;
+        [ObservableProperty] private string hmesMagazineNo;
+
+        partial void OnIsStartedChanged(bool value)
+        {
+            StartBtnText = value ? "STOP" : "START";
+        }
 
 
         [RelayCommand]
@@ -92,126 +84,119 @@ namespace ScanOutTool.ViewModels
         {
             if (!IsStarted)
             {
-                IsStarted = true;
-                StartBtnText = "STOP";
-                _appState.IsRunning = true;
-                //string logRoot = _configService.Config.ShopFloorLogPath;
-                //if (!Directory.Exists(logRoot))
-                //{
-                //    _loggingService.LogError($"Log path does not exist: {logRoot}");
-                //    return;
-                //}
-                //_dispatcher.Start(logRoot);
-                //_dispatcher.OnLog += (log) =>
-                //{
-                //    _loggingService.LogInformation(log);
-                //};
-                //_resultService.OnLog += (log) =>
-                //{
-                //    _loggingService.LogInformation(log);
-                //};
-                //_resultService.Start(logRoot);
-                _ = Task.Run(StartSerialProxyAsync);
-                await Task.Run(async () =>
+                IsSessionStarting = true;
+                StartBtnText = "STARTING...";
+
+                try
                 {
-                    try
+                    ShopFloorExePath = _configService.Config.ShopFloorExePath;
+                    KillProcess.KillChromeAndDriver();
+
+                    bool[] initResults = await Task.WhenAll(
+                        InitScanOutUIAndReadAsync(),
+                        StartDataExecuteSessionAsync()
+                    );
+
+                    if (initResults.All(result => result))
                     {
-                        await Task.WhenAll(
-                            InitScanOutUIAndReadAsync(),
-                            StartDataExecuteSessionAsync(),
-                            StartPLCAsync()
-                        );
+                        _appState.IsRunning = true;
+                        IsStarted = true;
+                        _ = Task.Run(StartSerialProxyAsync);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _loggingService.LogError($"Error during StartAllAsync: {ex.Message}");
+                        _appState.IsRunning = false;
+                        IsStarted = false;
                     }
-                });
+                }
+                catch (Exception ex)
+                {
+                    _appState.IsRunning = false;
+                    IsStarted = false;
+                    _loggingService.LogError($"Error during StartAllAsync: {ex.Message}");
+                }
+                finally
+                {
+                    IsSessionStarting = false;
+                    StartBtnText = IsStarted ? "STOP" : "START";
+                }
             }
             else
             {                
                 
                 IsStarted = false;
-                StartBtnText = "START";
                 _appState.IsRunning = false;
-                _dispatcher.Stop();
                 StopSerialProxy();
-                _plcService?.Dispose();
-                _isPLCConnected = false;
 
             }
         }
 
-        public DashboardViewModel(ILoggingService loggingService, IConfigService configService, IAppState appState, IPLCServiceFactory plcFactory, IScanResultService scanResultService, IScanResultDispatcher dispatcher,IBlockRFService blockRFService)
+        [RelayCommand]
+        private async Task ManualPrint()
+        {
+            try
+            {
+                IsDataSending = true;
+                bool success = await _scanDataService.PrintManual();
+
+                if (success)
+                {
+                    _loggingService.LogInformation("Manual print command sent successfully.");
+                }
+                else
+                {
+                    ShowWarningMessage("Không thể Manual Print. Vui lòng kiểm tra phiên HMES web.");
+                    _loggingService.LogWarning("Manual print command failed.");
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowWarningMessage($"Manual Print lỗi: {ex.Message}");
+                _loggingService.LogError($"Manual print error: {ex.Message}");
+            }
+            finally
+            {
+                IsDataSending = false;
+            }
+        }
+
+        public DashboardViewModel(
+            ILoggingService loggingService,
+            IConfigService configService,
+            IAppState appState,
+            IScanResultService scanResultService,
+            IBlockRFService blockRFService,
+            IAudioNotificationService audioNotificationService,
+            IShopFloorService shopFloorService,
+            IScanDataService scanDataService)
         {
             _loggingService = loggingService;
             _configService = configService;
             _appState = appState;
-            _plcFactory = plcFactory;
             _resultService = scanResultService;
-            _dispatcher = dispatcher;
             _blockRFService = blockRFService;
+            _audioNotificationService = audioNotificationService;
+            _shopFloorService = shopFloorService;
+            _scanDataService = scanDataService;
 
             _loggingService.OnNewLog += LoggerService_OnNewLog;
 
             _loggingService.LogInformation("Initializing DashboardViewModel...");
-            //Task.Run(async () =>
-            //{
-            //    var data = await _blockRFService.IsBlock("506HS1V1889");
-            //});
-            
+
             InitializeServices();
         }
 
         private void InitializeServices()
         {
             IsStarted = false;
+            StartBtnText = "START";
+            ShopFloorExePath = _configService.Config.ShopFloorExePath;
 
-            var cfg = _configService.Config;
-            _dataExecuter = new DataExecuter(new DataExecuterConfig
-            {
-                DbHost = cfg.ServerIP,
-                WebIpAddress = cfg.ServerIP
-            });
-
-            
-            _dataExecuter.StatusChanged += OnDataExcuteStatusChanged;
+            _scanDataService.StatusChanged += OnDataExcuteStatusChanged;
 
             RunModes = Enum.GetValues(typeof(RunMode)).Cast<RunMode>().ToList();
             SelectedRunMode = RunMode.ScanOut_Rescan;
         }
-
-        public void InitializePLC()
-        {
-            
-            if (_configService.Config.IsRobotMode && _configService.Config.PLCIP != null && _configService.Config.PLCPort != 0)
-            {
-                _plcService?.Dispose(); // nếu đã có instance cũ thì bỏ
-                string ip = _configService.Config.PLCIP;
-                int port = _configService.Config.PLCPort;
-                bool isAsciiMode = true;
-
-                _plcService = _plcFactory.Create(ip, port, isAsciiMode);
-
-                _plcService.OnConnectionChanged += (conn) =>
-                {
-                    _isPLCConnected = conn;
-                    if (conn)
-                    {
-                        _loggingService.LogInformation("PLC connected.");
-                    }
-                    else
-                    {
-                        _loggingService.LogError("PLC disconnected.");
-                    }
-                };
-            }
-            else
-            {
-                _loggingService.LogError("PLC service is not configured or IP/Port is invalid.");
-            }
-        }
-
 
         private void LoggerService_OnNewLog(object? sender, LogEntry e)
         {
@@ -240,146 +225,18 @@ namespace ScanOutTool.ViewModels
 
             _serialProxyManager = new SerialProxyManager
             {
-                Logger = new SerilogProxyLogger(_loggingService),
-                WaitForGuiProcessAsync = async (sentData) =>
-                {
-                    if(sentData.Contains("CLEAR") || sentData.Contains("TRACE") || IsNone )
-                    {
-                        return true;
-                    }
-
-                    if (!_autoScanOutUI.IsScanoutUI()) return true;
-                    var readScanOutTask = ReadScanOutResult(sentData);
-                    bool result = await readScanOutTask;
-
-                    var (isHSMESBlocked, reason) = _dataExecuter.IsBlocked(sentData);
-                    if (isHSMESBlocked)
-                    {                       
-                        PlayNgSound();
-                        InformationMessage = $"PID {sentData} đã bị block do {reason} , vui lòng kiểm tra lại";
-                        IsMessageOn = true;
-                        return true;
-                    }
-
-                    if (result && !isInChooseEBRMode)
-                    {                        
-                        bool executeResult = await SendDataExecuteAsync();
-                        if (_configService.Config.IsRobotMode && executeResult)
-                        {
-                            await ReadPCBInfoFromPCB();
-                        }
-                    }                       
-                    else if(result && isInChooseEBRMode)
-                    {
-                        if(_configService.Config.IsWOMode)
-                        {
-                            InformationMessage = $"Bạn có muốn chọn {WorkOrder} để Rescan không?\r\n Nếu có scan TRACE";
-                        }
-                        else
-                        {
-                            InformationMessage = $"Bạn có muốn chọn {PartNo} để Rescan không?\r\n Nếu có scan TRACE";
-                        }
-
-                        IsMessageOn = true;
-                        IsConfirmEBRStep = true;
-                    }   
-
-                    // Nếu cần: đọc GUI tại đây rồi return true/false
-                    return true;
-                }
+                Logger = new SerilogProxyLogger(_loggingService)
             };
 
-            _serialProxyManager.OnDataForwardingAsync += async (s, e) =>
+            _serialProxyManager.OnScannerDataReceived += async (s, e) =>
             {
-                PlayBeepSound();
-                mainSW.Restart(); //Restart main stop watch
-                IsMessageOn = false;
-                _loggingService.LogInformation($"[Event] {(e.FromDevice ? "Device" : "App")} gửi: {e.Data}");
-              
-                if(_configService.Config.IsBlockRFMode )
-                {             
-                    RFInfo rFInfo = await _blockRFService.IsBlock(e.Data);
-                    if(rFInfo != null)
-                    {
-                        PlayNgSound();
-                        e.Cancel = true; // Ngăn không cho dữ liệu đi tiếp
-                        InformationMessage = $"PID {e.Data} đã bị chặn do NG RF ở jig {rFInfo.MachineIP} band {rFInfo.Band} sinal{rFInfo.Signpath}, vui lòng kiểm tra lại";
-                        IsMessageOn = true;
-                        return;
-                    }    
-                    
-                }                
+                await HandleScannerDataReceivedAsync(e.Data);
+            };
 
-                _loggingService.LogInformation($"Check block done,{mainSW.ElapsedMilliseconds}ms");
-                // Vaof chees ddooj chonj EBR
-                if(e.Data.ToUpper().Contains("CHOOSE"))
-                {
-                    if(!IsInChooseEBRMode)
-                    {
-                        IsInChooseEBRMode = true;
-                        // Nếu dữ liệu có chứa từ khóa "CHOOSE", thì hiển thị cửa sổ chọn EBR
-                        InformationMessage = ($"Vui lòng scan PCB PartNo mà bạn muốn Rescan");
-                        IsMessageOn = true;
-                    }
-                    else
-                    {
-                        IsInChooseEBRMode = false;
-                        // Nếu dữ liệu có chứa từ khóa "CHOOSE", thì hiển thị cửa sổ chọn EBR
-                        InformationMessage = "";
-                        IsMessageOn = false;
-                    }
-                    _loggingService.LogInformation($"[Event] {e.Data} - Is in Choose Mode: {IsInChooseEBRMode}");
-                    e.Cancel=true;
-                }
-                else if (e.Data.ToUpper().Contains("TRACE") && IsConfirmEBRStep)
-                {
-                    if(_configService.Config.IsWOMode)
-                    {
-                        SelectedEBR = WorkOrder;
-                    }
-                    else
-                    {
-                        SelectedEBR = PartNo;
-                    }                    
-                    InformationMessage = $"";
-                    IsMessageOn = false;
-                    IsConfirmEBRStep = false;
-                    IsInChooseEBRMode=false;
-                    await SendDataExecuteAsync();
-                    _loggingService.LogInformation($"[Event] {e.Data} - Is in Choose Mode: {IsInChooseEBRMode}");
-                    e.Cancel = true; // Ngăn không cho dữ liệu đi tiếp
-                }
-                else if (e.Data.ToUpper().Contains("CLEAR") && IsInChooseEBRMode)
-                {     
-                    InformationMessage = $"";
-                    IsMessageOn = false;
-                    IsConfirmEBRStep = false;
-                    IsInChooseEBRMode = false;
-                    _loggingService.LogInformation($"[Event] {e.Data} - Is in Choose Mode: {IsInChooseEBRMode}");
-                    e.Cancel = true; // Ngăn không cho dữ liệu đi tiếp
-                }
-                else if (!e.Data.Contains("CLEAR") && !e.Data.Contains("TRACE") && e.Data.Trim().Length != 11 && e.Data.Trim().Length != 22)
-                {
-                    _loggingService.LogInformation($"[Event] {e.Data.Trim()} - Data length: {e.Data.Trim().Length}");
-                    e.Cancel = true;
-                }
-                _loggingService.LogInformation($"Check logic done {mainSW.ElapsedMilliseconds}");
-                if (SelectedRunMode == RunMode.RescanOnly)
-                {           
-                    _loggingService.LogInformation($"[Event] {e.Data} - Rescan only mode");
-                    e.Cancel = true;
-                    await _dataExecuter.SendDatatoRescanAsync(e.Data);
-                    int currentPCBQty = await _dataExecuter.GetPackQty();
-                    int totalPCBQty = await _dataExecuter.GetMagazineQty();
-
-                    _loggingService.LogInformation($"Current PCB Qty: {currentPCBQty}, Total PCB Qty: {totalPCBQty}, Magazine Qty: {MagazineQty}, {mainSW.ElapsedMilliseconds}ms");
-                    if (MagazineQty != 0 && MagazineQty != totalPCBQty && currentPCBQty == MagazineQty)
-                    {
-                        if (MagazineQty > totalPCBQty && currentPCBQty >= (totalPCBQty - 1))
-                            MessageBox.Show("Số lượng PCB trên hệ thống HMES đang nhỏ hơn số lượng cài đặt", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                        await _dataExecuter.PrintManual();
-                    }
-                }
+            _serialProxyManager.OnAppDataReceived += async (s, e) =>
+            {
+                _loggingService.LogInformation($"[Event] App gửi: {e.Data}");
+                await _serialProxyManager.SendToScannerAsync(e.Data);
             };
             //_loggingService.LogInformation($"Starting serial proxy: Device={comDevice.SelectedPort}, App={comApp.SelectedPort}, BaudRate={comDevice.SelectedBaudRate}, Parity={comDevice.SelectedParity}, DataBits={comDevice.SelectedDataBits}, StopBits={comDevice.SelectedStopBits}");
 
@@ -388,65 +245,269 @@ namespace ScanOutTool.ViewModels
             //_loggingService.LogInformation("Serial proxy started successfully.");
         }
 
-        private async Task StopSerialProxy()
+        private async Task HandleScannerDataReceivedAsync(string data)
+        {
+            _audioNotificationService.PlayBeep();
+            mainSW.Restart();
+            IsMessageOn = false;
+            _loggingService.LogInformation($"[Event] Device gửi: {data}");
+
+            if (await TryHandleSpecialScannerDataAsync(data))
+            {
+                return;
+            }
+
+            string pid = data.Trim();
+            bool skipWebSend = await IsBlockedByRfAsync(pid);
+
+            HmesBlockAction hmesBlockAction = CheckHmesBlock(pid);
+            if (hmesBlockAction == HmesBlockAction.StopBeforeShopFloor)
+            {
+                return;
+            }
+
+            if (skipWebSend || hmesBlockAction == HmesBlockAction.SkipWebAfterShopFloor)
+            {
+                if (IsRescanOnly)
+                {
+                    _loggingService.LogWarning($"Bỏ qua gửi web/rescan cho PID {pid} do RF/HMES block trong Rescan only mode.");
+                    return;
+                }
+
+                MarkSkipWebSendAfterShopFloor(pid);
+            }
+
+            if (IsRescanOnly)
+            {
+                _loggingService.LogInformation($"[Event] {pid} - Rescan only mode, sending directly to web.");
+                await SendRescanOnlyAsync(pid);
+                return;
+            }
+
+            await _serialProxyManager.SendToAppAsync(data);
+            await ProcessShopFloorResultAfterForwardAsync(data);
+        }
+
+        private async Task<bool> TryHandleSpecialScannerDataAsync(string data)
+        {
+            if (data.ToUpper().Contains("CHOOSE"))
+            {
+                IsInChooseEBRMode = !IsInChooseEBRMode;
+                InformationMessage = IsInChooseEBRMode ? "Vui lòng scan PCB PartNo mà bạn muốn Rescan" : "";
+                IsMessageOn = IsInChooseEBRMode;
+                _loggingService.LogInformation($"[Event] {data} - Is in Choose Mode: {IsInChooseEBRMode}");
+                return true;
+            }
+
+            if (data.ToUpper().Contains("TRACE") && IsConfirmEBRStep)
+            {
+                SelectedEBR = _configService.Config.IsWOMode ? WorkOrder : PartNo;
+                InformationMessage = "";
+                IsMessageOn = false;
+                IsConfirmEBRStep = false;
+                IsInChooseEBRMode = false;
+                await SendDataExecuteAsync();
+                _loggingService.LogInformation($"[Event] {data} - Is in Choose Mode: {IsInChooseEBRMode}");
+                return true;
+            }
+
+            if (data.ToUpper().Contains("CLEAR") && IsInChooseEBRMode)
+            {
+                InformationMessage = "";
+                IsMessageOn = false;
+                IsConfirmEBRStep = false;
+                IsInChooseEBRMode = false;
+                _loggingService.LogInformation($"[Event] {data} - Is in Choose Mode: {IsInChooseEBRMode}");
+                return true;
+            }
+
+            if (!data.Contains("CLEAR") && !data.Contains("TRACE") && data.Trim().Length != 11 && data.Trim().Length != 22)
+            {
+                _loggingService.LogInformation($"[Event] {data.Trim()} - Data length: {data.Trim().Length}");
+                return true;
+            }
+
+            _loggingService.LogInformation($"Check logic done {mainSW.ElapsedMilliseconds}");
+
+            return false;
+        }
+
+        private async Task<bool> IsBlockedByRfAsync(string pid)
+        {
+            RFInfo rFInfo = await _blockRFService.IsBlock(pid);
+            if (rFInfo == null)
+            {
+                _loggingService.LogInformation($"Check RF block done,{mainSW.ElapsedMilliseconds}ms");
+                return false;
+            }
+
+            ShowWarningMessage($"PID {pid} đã bị chặn do NG RF ở jig {rFInfo.MachineIP} band {rFInfo.Band} sinal{rFInfo.Signpath}");
+            _loggingService.LogWarning($"PID {pid} bị RF block");
+            return true;
+        }
+
+        private HmesBlockAction CheckHmesBlock(string pid)
+        {
+            var (isHSMESBlocked, reason) = _scanDataService.IsBlocked(pid);
+
+            if (!isHSMESBlocked)
+            {
+                _skipWebSendPids.Remove(pid);
+                return HmesBlockAction.AllowFullFlow;
+            }
+
+            if (IsXrayBlock(reason))
+            {
+                ShowHmesBlockedMessage(pid, reason);
+                return HmesBlockAction.StopBeforeShopFloor;
+            }
+
+            ShowWarningMessage($"PID {pid} đã bị block do {reason}");
+            _loggingService.LogWarning($"PID {pid} bị HMES block do {reason}");
+            return HmesBlockAction.SkipWebAfterShopFloor;
+        }
+
+        private void MarkSkipWebSendAfterShopFloor(string pid)
+        {
+            _skipWebSendPids.Add(pid);
+        }
+
+        private void ShowHmesBlockedMessage(string pid, string reason)
+        {
+            ShowWarningMessage($"PID {pid} đã bị block do {reason} , vui lòng kiểm tra lại");
+        }
+
+        private bool ShouldSkipWebSendAfterShopFloor(string pid)
+        {
+            return _skipWebSendPids.Remove(pid.Trim());
+        }
+
+        private static bool IsXrayBlock(string reason)
+        {
+            return !string.IsNullOrWhiteSpace(reason)
+                && reason.IndexOf("Xray", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private async Task ProcessShopFloorResultAfterForwardAsync(string sentData)
+        {
+            if (sentData.Contains("CLEAR") || sentData.Contains("TRACE") || IsNone)
+            {
+                return;
+            }
+
+            if (!_shopFloorService.IsScanoutUI()) return;
+
+            bool result = await ReadScanOutResult(sentData);
+            if (!result)
+            {
+                return;
+            }
+
+            if (ShouldSkipWebSendAfterShopFloor(sentData))
+            {
+                _loggingService.LogWarning($"Bỏ qua gửi HMES/web/rescan cho PID {sentData.Trim()} do RF/HMES block.");
+                return;
+            }
+
+            if (!IsInChooseEBRMode)
+            {
+                await SendDataExecuteAsync();
+            }
+            else
+            {
+                InformationMessage = _configService.Config.IsWOMode
+                    ? $"Bạn có muốn chọn {WorkOrder} để Rescan không?\r\n Nếu có scan TRACE"
+                    : $"Bạn có muốn chọn {PartNo} để Rescan không?\r\n Nếu có scan TRACE";
+
+                IsMessageOn = true;
+                IsConfirmEBRStep = true;
+            }
+        }
+
+        private async Task SendRescanOnlyAsync(string data)
+        {
+            await _scanDataService.ProcessDataAsync(
+                workOrder: string.Empty,
+                partNo: string.Empty,
+                pid: data,
+                validateDatabase: false,
+                transferToWeb: true);
+            await RefreshHmesInfoAsync();
+            int currentPCBQty = await _scanDataService.GetPackQty();
+            int totalPCBQty = await _scanDataService.GetMagazineQty();
+
+            _loggingService.LogInformation($"Current PCB Qty: {currentPCBQty}, Total PCB Qty: {totalPCBQty}, Magazine Qty: {MagazineQty}, {mainSW.ElapsedMilliseconds}ms");
+            if (MagazineQty != 0 && MagazineQty != totalPCBQty && currentPCBQty == MagazineQty)
+            {
+                if (MagazineQty > totalPCBQty && currentPCBQty >= (totalPCBQty - 1))
+                    ShowErrorDialog("Số lượng PCB trên hệ thống HMES đang nhỏ hơn số lượng cài đặt");
+                await _scanDataService.PrintManual();
+            }
+        }
+
+        private void ShowWarningMessage(string message)
+        {
+            _audioNotificationService.PlayNg();
+            InformationMessage = message;
+            IsMessageOn = true;
+        }
+
+        private void StopSerialProxy()
         {
             // Dừng proxy
             _serialProxyManager?.Stop();
         }
 
-        private async Task InitScanOutUIAndReadAsync()
+        private async Task<bool> InitScanOutUIAndReadAsync()
         {
             try
             {
-                _autoScanOutUI = new AutoScanOutUI(_loggingService);
-                //var rect = _autoScanOutUI.GetResultElementBounds();
-                //Application.Current.Dispatcher.Invoke(() =>
-                //{
-                //    _showRescanResultService.ShowRescanResult(rect.X, rect.Y, rect.Width, rect.Height);
-                //});
-
-                //_showRescanResultService.SetRescanResult("NG", "10/20", "OK added");
+                await _shopFloorService.InitializeAsync();
             }
             catch (Exception ex)
             {
                 _loggingService.LogError($"Failed to initialize AutoScanOutUI: {ex.Message}");
-                return;
+                return false;
             }
-            await ReadScanOutGUI();
+
+            try
+            {
+                _loggingService.LogInformation("Reading initial ShopFloor UI data...");
+                var scanResult = await RunWithTimeoutAsync(
+                    () => _shopFloorService.ReadCurrent(),
+                    TimeSpan.FromSeconds(10),
+                    "Read initial ShopFloor UI data");
+                ApplyShopFloorResult(scanResult);
+                _loggingService.LogInformation("Initial ShopFloor UI data read successfully.");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"Failed to read initial ShopFloor UI data: {ex.Message}");
+                return false;
+            }
+
+            return true;
         }
 
-        private async Task StartPLCAsync()
-        {
-            if (!_configService.Config.IsRobotMode) return;
-            InitializePLC();
-            _loggingService.LogInformation($"Starting PLC: IP={_configService.Config.PLCIP}, Port={_configService.Config.PLCPort}");
-            _loggingService.LogInformation($"Total Tray: {_plcService.GetTotalTray()}");
-            _loggingService.LogInformation($"Current Tray: {_plcService.GetCurrentTray()}");
-            _loggingService.LogInformation($"Total Slot: {_plcService.GetTotalSlot()}");
-            _loggingService.LogInformation($"Current Slot: {_plcService.GetCurrentSlot()}");
-            _loggingService.LogInformation($"Current Model Number: {_plcService.GetCurrentModelNumber()}");
-            _loggingService.LogInformation($"Current PID: {_plcService.ReadPID()}");
-
-        }
-
-
-        private async Task StartDataExecuteSessionAsync()
+        private async Task<bool> StartDataExecuteSessionAsync()
         {
             try
             {
-                IsSessionStarting = true;
-                bool success = await _dataExecuter.StartSessionAsync();
+                bool success = await _scanDataService.StartSessionAsync();
 
                 if (!success)
                 {
                     //MessageBox.Show("Failed to start session.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     _loggingService.LogError("Failed to start data execute session.");
                 }
+
+                return success;
             }
-            finally
+            catch (Exception ex)
             {
-                IsSessionStarting = false;
-            }            
+                _loggingService.LogError($"Failed to start data execute session: {ex.Message}");
+                return false;
+            }
         }
 
         private async Task<bool> SendDataExecuteAsync()
@@ -458,24 +519,30 @@ namespace ScanOutTool.ViewModels
             {
                 IsDataSending = true;               
 
-                _loggingService.LogInformation($"Sending data to database: WorkOrder={workOrder}, ModelSuffix={partNo}, WipSerialNumber={pID}");
+                _loggingService.LogInformation($"Sending data to database: WorkOrder={WorkOrder}, ModelSuffix={PartNo}, WipSerialNumber={PID}");
                 ProcessResult result = new ProcessResult();
                 if(IsScanOutOnly)
                 {
-                    result =  await _dataExecuter.SendDataScanoutOnlyAsync(workOrder, partNo, pID);                    
+                    result =  await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID, validateDatabase: true, transferToWeb: false);                    
                 }
                 else if (IsRescanOnly)
                 {
-                    result = await _dataExecuter.SendDatatoRescanAsync(pID);
-                    int currentPCBQty = await _dataExecuter.GetPackQty();
-                    int totalPCBQty = await _dataExecuter.GetMagazineQty();
+                    result = await _scanDataService.ProcessDataAsync(
+                        workOrder: string.Empty,
+                        partNo: string.Empty,
+                        pid: PID,
+                        validateDatabase: false,
+                        transferToWeb: true);
+                    await RefreshHmesInfoAsync();
+                    int currentPCBQty = await _scanDataService.GetPackQty();
+                    int totalPCBQty = await _scanDataService.GetMagazineQty();
 
                     _loggingService.LogInformation($"Current PCB Qty: {currentPCBQty}, Total PCB Qty: {totalPCBQty}, Magazine Qty: {MagazineQty}");
                     if (MagazineQty != 0 && MagazineQty != totalPCBQty && currentPCBQty == MagazineQty)
                     {
                         if (MagazineQty > totalPCBQty && currentPCBQty >= (totalPCBQty - 1))
-                            MessageBox.Show("Số lượng PCB trên hệ thống HMES đang nhỏ hơn số lượng cài đặt", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                        await _dataExecuter.PrintManual();
+                            ShowErrorDialog("Số lượng PCB trên hệ thống HMES đang nhỏ hơn số lượng cài đặt");
+                        await _scanDataService.PrintManual();
                     }
                 }
                 else
@@ -511,8 +578,13 @@ namespace ScanOutTool.ViewModels
                     finalResult = true;
                 }
 
+                if (!IsScanOutOnly)
+                {
+                    await RefreshHmesInfoAsync();
+                }
+
                 // 데이터 클리어 (설정에 따라)
-                if (_dataExecuter.ShouldClearAfterSend)
+                if (_scanDataService.ShouldClearAfterSend)
                 {
                     ClearInputFields();
                 }
@@ -534,22 +606,22 @@ namespace ScanOutTool.ViewModels
         private async Task<ProcessResult> SendInWOMode()
         {            
             ProcessResult result = new ProcessResult();
-            if (string.IsNullOrEmpty(workOrder)) return result;
+            if (string.IsNullOrEmpty(WorkOrder)) return result;
             if (string.IsNullOrEmpty(SelectedEBR))
             {
-                MessageBox.Show("Vui lòng chọn Part No trước khi scan", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                result = await _dataExecuter.SendDataScanoutOnlyAsync(workOrder, partNo, pID);
+                ShowErrorDialog("Vui lòng chọn Part No trước khi scan");
+                result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID, validateDatabase: true, transferToWeb: false);
             }
             else
             {
-                if (workOrder != SelectedEBR)
+                if (WorkOrder != SelectedEBR)
                 {
-                    _loggingService.LogInformation($"PartNo miss match: {workOrder} != {SelectedEBR}");
-                    result = await _dataExecuter.SendDataScanoutOnlyAsync(workOrder, partNo, pID);
+                    _loggingService.LogInformation($"PartNo miss match: {WorkOrder} != {SelectedEBR}");
+                    result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID, validateDatabase: true, transferToWeb: false);
                 }
                 else
                 {
-                    result = await _dataExecuter.ProcessDataAsync(workOrder, partNo, pID);
+                    result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID);
                 }
             }
             return result;
@@ -558,33 +630,33 @@ namespace ScanOutTool.ViewModels
         private async Task<ProcessResult> SendInEBRMode()
         {
             ProcessResult result = new ProcessResult();
-            if(string.IsNullOrEmpty(partNo)) return result;
-            if (partNo != SelectedEBR && !string.IsNullOrEmpty(SelectedEBR))
+            if(string.IsNullOrEmpty(PartNo)) return result;
+            if (PartNo != SelectedEBR && !string.IsNullOrEmpty(SelectedEBR))
             {
-                _loggingService.LogInformation($"PartNo miss match: {partNo} != {SelectedEBR}");
-                int PackQty = await _dataExecuter.GetPackQty();
+                _loggingService.LogInformation($"PartNo miss match: {PartNo} != {SelectedEBR}");
+                int PackQty = await _scanDataService.GetPackQty();
                 if (PackQty == 0)
                 {                    
-                    result = await _dataExecuter.SendDataScanoutOnlyAsync(workOrder, partNo, pID);
+                    result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID, validateDatabase: true, transferToWeb: false);
                 }
                 else
                 {
-                    result = await _dataExecuter.ProcessDataAsync(workOrder, partNo, pID);
+                    result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID);
                 }
             }
             else
             {
-                result = await _dataExecuter.ProcessDataAsync(workOrder, partNo, pID);
+                result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID);
             }
 
-            int currentPCBQty = await _dataExecuter.GetPackQty();
-            int totalPCBQty = await _dataExecuter.GetMagazineQty();
+            int currentPCBQty = await _scanDataService.GetPackQty();
+            int totalPCBQty = await _scanDataService.GetMagazineQty();
 
             if(MagazineQty !=0 && MagazineQty != totalPCBQty && currentPCBQty == MagazineQty)
             {
                 if(MagazineQty>totalPCBQty && currentPCBQty >= (totalPCBQty-1)) 
-                    MessageBox.Show("Số lượng PCB trên hệ thống HMES đang nhỏ hơn số lượng cài đặt", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                await _dataExecuter.PrintManual();
+                    ShowErrorDialog("Số lượng PCB trên hệ thống HMES đang nhỏ hơn số lượng cài đặt");
+                await _scanDataService.PrintManual();
             }
 
             return result;
@@ -594,65 +666,24 @@ namespace ScanOutTool.ViewModels
 
         public async Task<bool> ReadScanOutResult(string pid)
         {
-            if (_autoScanOutUI == null)
-            {
-                _loggingService.LogError("AutoScanOutUI is not initialized.");
-                return false;
-            }
-
-            pid = pid.Trim();
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            while (pid != _autoScanOutUI.ReadPID())
-            {
-                if (_autoScanOutUI.ReadPID().Contains("PLZ Read below Message and Clear") && _autoScanOutUI.ReadMessage().Contains(pid))
-                {
-                    _loggingService.LogInformation($"ScanOut NG:{pid},{PartNo},{WorkOrder},{Result},{ResultMessage}:{sw.ElapsedMilliseconds}ms");
-                    sw.Stop();
-                    sw.Reset();
-                    return false;
-                }
-                if (sw.ElapsedMilliseconds > 5000)
-                {
-                    _loggingService.LogError($"Timeout to get scanout PID {pid} result: {_autoScanOutUI.ReadPID()} - {_autoScanOutUI.ReadMessage()}:{sw.ElapsedMilliseconds}ms");
-                    sw.Stop();
-                    sw.Reset();
-                    return false;
-                }
-                await Task.Delay(50); // Delay to avoid busy waiting
-            }
-            
-            
             try
             {
-                PID = _autoScanOutUI.ReadPID();
-                WorkOrder = _autoScanOutUI.ReadWO();
-                PartNo = _autoScanOutUI.ReadEBR();
-                Result = _autoScanOutUI.ReadResult();
-                ResultMessage = _autoScanOutUI.ReadMessage(); 
+                var sw = Stopwatch.StartNew();
+                var scanResult = await _shopFloorService.WaitForResultAsync(pid);
+                ApplyShopFloorResult(scanResult);
 
                 _loggingService.LogInformation($"Data from ScanOut GUI:{PID},{PartNo},{WorkOrder},{Result}:{sw.ElapsedMilliseconds}ms");
 
-                if (Result == "OK")
-                {                    
-                    //_loggingService.LogInformation($"Scan out OK: PID: {PID}, WorkOrder: {WorkOrder}, PartNo: {PartNo}, Result: {Result}:{sw.ElapsedMilliseconds}ms");                    
-                    sw.Stop();
-                    sw.Reset();
-                    return true;
-                }
-                else
+                if (!scanResult.IsOk)
                 {
-                    //_loggingService.LogError($"Scan out NG: PID: {PID}, WorkOrder: {WorkOrder}, PartNo: {PartNo}, Result: {Result}, {ResultMessage}:{sw.ElapsedMilliseconds}ms");
-                    sw.Stop();
-                    sw.Reset();
-                    return false;
+                    _loggingService.LogInformation($"ScanOut NG:{pid},{PartNo},{WorkOrder},{Result},{ResultMessage}:{sw.ElapsedMilliseconds}ms");
                 }
+
+                return scanResult.IsOk;
             }
             catch (Exception ex)
             {
-                //_loggingService.LogError($"Failed to read scan out result: {ex.Message}:{sw.ElapsedMilliseconds}ms");
-                sw.Stop();
-                sw.Reset();
+                _loggingService.LogError($"Failed to read scan out result: {ex.Message}");
                 return false;
             }
 
@@ -681,56 +712,67 @@ namespace ScanOutTool.ViewModels
         }
 
 
-        private async Task ReadScanOutGUI()
+        private void ReadScanOutGUI()
         {
-            if (_autoScanOutUI == null) return;
-
-            PID = _autoScanOutUI.ReadPID();
-            WorkOrder = _autoScanOutUI.ReadWO();
-            PartNo = _autoScanOutUI.ReadEBR();
-            Result = _autoScanOutUI.ReadResult();
-            ResultMessage = _autoScanOutUI.ReadMessage();
-
+            ApplyShopFloorResult(_shopFloorService.ReadCurrent());
         }
+
+        private void ApplyShopFloorResult(ShopFloorScanResult scanResult)
+        {
+            PID = scanResult.PID;
+            WorkOrder = scanResult.WorkOrder;
+            PartNo = scanResult.PartNo;
+            Result = scanResult.Result;
+            Progress = scanResult.Progress;
+            ResultMessage = scanResult.Message;
+        }
+
+        private async Task RefreshHmesInfoAsync()
+        {
+            try
+            {
+                RescanInfo info = await _scanDataService.GetLastRescanInfo();
+                HmesResult = info.Result;
+                HmesMessage = info.Message;
+                HmesPackQty = info.PackQty;
+                HmesMagazineQty = info.MagazineQty;
+                HmesMagazineNo = info.MagazineNo;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogWarning($"Failed to refresh HMES info: {ex.Message}");
+            }
+        }
+
+        private static void ShowErrorDialog(string message)
+        {
+            MessageBox.Show(Application.Current.MainWindow, message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
         private void ClearInputFields()
         {
-            workOrder = "";
-            partNo = "";
-            pID = "";
-        }
-
-        private async Task ReadPCBInfoFromPCB()
-        {
-            if (_plcService == null)
-            {
-                _loggingService.LogError("PLC service is not initialized.");
-                return;
-            }
-            if (!_isPLCConnected)
-            {
-                _loggingService.LogError("PLC is not connected.");
-                return;
-            }
-            await _plcService.SetPassSignalAsync();
-            _loggingService.LogInformation("Reading PCB info from PLC...");
-            int modelNumber = _plcService.GetCurrentModelNumber();
-            int CurrentSlot = _plcService.GetCurrentSlot();
-            int TotalSlot = _plcService.GetTotalSlot();
-            int TraySlot = _plcService.GetTraySlot();
-            int TotalTray = _plcService.GetTotalTray();
-            int CurrentTray = _plcService.GetCurrentTray();
-
-            int currentPCBQty = CurrentSlot + CurrentTray * TraySlot;
-            int totalPCBQty = TraySlot * TotalTray;
-            _loggingService.LogInformation($"DataReading from PLC: Model Number: {modelNumber}, Current Slot: {CurrentSlot}, Total Slot: {TotalSlot}");
-            PCBLocation = $"{currentPCBQty}/{totalPCBQty}";
-            MagazineQty = TotalSlot;
+            WorkOrder = "";
+            PartNo = "";
+            PID = "";
         }
 
         private void OnDataExcuteStatusChanged(object sender, string status)
         {
             //MessageBox.Show(status);
             _loggingService.LogInformation(status);
+        }
+
+        private static async Task<T> RunWithTimeoutAsync<T>(Func<T> action, TimeSpan timeout, string operationName)
+        {
+            Task<T> task = Task.Run(action);
+            Task completedTask = await Task.WhenAny(task, Task.Delay(timeout));
+
+            if (completedTask != task)
+            {
+                throw new TimeoutException($"{operationName} timed out after {timeout.TotalSeconds:0}s.");
+            }
+
+            return await task;
         }
 
         public class SerilogProxyLogger : IProxyLogger
@@ -744,34 +786,6 @@ namespace ScanOutTool.ViewModels
             public void Log(string message)
             {
                 _logger.LogInformation(message);
-            }
-        }
-
-        void PlayNgSound()
-        {
-            try
-            {
-                string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "scan_fail.wav");
-                var player = new SoundPlayer(filePath); // đường dẫn tới file âm thanh NG
-                player.Play(); // hoặc PlaySync() nếu muốn đợi âm thanh phát xong
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError("Lỗi phát âm thanh: " + ex.Message);
-            }
-        }
-
-        void PlayBeepSound()
-        {
-            try
-            {
-                string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "ScannerBeepSound.wav");
-                var player = new SoundPlayer(filePath); // đường dẫn tới file âm thanh NG
-                player.Play(); // hoặc PlaySync() nếu muốn đợi âm thanh phát xong
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError("Lỗi phát âm thanh: " + ex.Message);
             }
         }
 

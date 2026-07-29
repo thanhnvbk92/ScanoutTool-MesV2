@@ -1,10 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MaterialDesignColors;
-using MaterialDesignThemes.Wpf;
-using ScanOutTool.Helpers;
+using ScanOutTool.Utilities;
 using ScanOutTool.Services;
-using System.Linq;
 
 namespace ScanOutTool.ViewModels
 {
@@ -23,9 +20,6 @@ namespace ScanOutTool.ViewModels
         private int selectedMenuIndex;
 
         [ObservableProperty]
-        private bool isDarkTheme;
-
-        [ObservableProperty]
         private string pageName;
 
         public MainViewModel(INavigationService navigationService, IUpdateService updateService)
@@ -35,36 +29,8 @@ namespace ScanOutTool.ViewModels
             IsSidebarOpen = true;
             //SelectedMenuIndex = 0;
 
-            // Khởi tạo trạng thái Theme hiện tại
-            var paletteHelper = new PaletteHelper();
-            var theme = paletteHelper.GetTheme();
-            IsDarkTheme = theme.GetBaseTheme() == BaseTheme.Dark;
-
             Title = $"Scan Out Tool v{getVersion()}";
             KillProcess.KillChromeDriver();
-        }
-
-
-        partial void OnIsDarkThemeChanged(bool value)
-        {
-            var paletteHelper = new PaletteHelper();
-            var theme = paletteHelper.GetTheme();
-
-            if (value)
-            {
-                theme.SetBaseTheme(BaseTheme.Dark);
-            }
-            else
-            {
-                theme.SetBaseTheme(BaseTheme.Light);
-                var swatch = new SwatchesProvider().Swatches.FirstOrDefault(s=>s.Name== "deeppurple");
-
-                if (swatch != null)
-                {
-                    theme.SetPrimaryColor(swatch.PrimaryHues[5].Color); // index 5 = shade 500
-                }
-            }
-            paletteHelper.SetTheme(theme);
         }
 
         [RelayCommand]
