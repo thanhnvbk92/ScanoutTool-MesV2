@@ -39,6 +39,19 @@
             <Setter Property="FontSize" Value="15"/>
         </Style>
 
+        <Style x:Key="ShopFloorInfoValueStyle" TargetType="TextBlock" BasedOn="{StaticResource ValueStyle}">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="MinHeight" Value="26"/>
+        </Style>
+
+        <Style x:Key="ShopFloorPrimaryInfoValueStyle" TargetType="TextBlock" BasedOn="{StaticResource ValueStyle}">
+            <Setter Property="FontSize" Value="30"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="MinHeight" Value="40"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+
         <Style x:Key="LargeResultStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
             <Setter Property="FontSize" Value="110"/>
@@ -137,18 +150,61 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="MonitorDashboard" Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <TextBlock Text="ShopFloor Data" Style="{StaticResource SectionTitleStyle}"/>
                         </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Command="{Binding ShopFloorClearCommand}"
+                                    Height="36"
+                                    MinWidth="92"
+                                    Padding="12,0"
+                                    Margin="0,0,8,0"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Broom" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="CLEAR"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding ShopFloorTraceCommand}"
+                                    Height="36"
+                                    MinWidth="92"
+                                    Padding="12,0"
+                                    Style="{StaticResource MaterialDesignOutlinedButton}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="History" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="TRACE"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Grid>
 
-                    <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <UniformGrid Grid.Row="1" Columns="3" Rows="1" Margin="0,18,0,8">
+                        <StackPanel Margin="0,0,14,0">
+                            <TextBlock Text="PID" Style="{StaticResource CaptionStyle}"/>
+                            <TextBlock Text="{Binding PID}" Style="{StaticResource ShopFloorInfoValueStyle}"/>
+                        </StackPanel>
+                        <StackPanel Margin="0,0,14,0">
+                            <TextBlock Text="Part No" Style="{StaticResource CaptionStyle}"/>
+                            <TextBlock Text="{Binding PartNo}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Work Order" Style="{StaticResource CaptionStyle}"/>
+                            <TextBlock Text="{Binding WorkOrder}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
+                        </StackPanel>
+                    </UniformGrid>
+
+                    <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Result}" Style="{StaticResource LargeResultStyle}"/>
                         <StackPanel HorizontalAlignment="Center" Margin="0,-8,0,4">
                             <TextBlock Text="Progress" Style="{StaticResource CaptionStyle}" HorizontalAlignment="Center"/>
@@ -162,32 +218,11 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <Grid Grid.Row="2">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <UniformGrid Grid.Row="0" Columns="3" Rows="1" Margin="0,0,0,14">
-                            <StackPanel Margin="0,0,14,0">
-                                <TextBlock Text="PID" Style="{StaticResource CaptionStyle}"/>
-                                <TextBlock Text="{Binding PID}" Style="{StaticResource ValueStyle}"/>
-                            </StackPanel>
-                            <StackPanel Margin="0,0,14,0">
-                                <TextBlock Text="Part No" Style="{StaticResource CaptionStyle}"/>
-                                <TextBlock Text="{Binding PartNo}" Style="{StaticResource ValueStyle}"/>
-                            </StackPanel>
-                            <StackPanel>
-                                <TextBlock Text="Work Order" Style="{StaticResource CaptionStyle}"/>
-                                <TextBlock Text="{Binding WorkOrder}" Style="{StaticResource ValueStyle}"/>
-                            </StackPanel>
-                        </UniformGrid>
-
-                        <TextBox Grid.Row="1"
-                                 Text="{Binding ResultMessage}"
-                                 materialDesign:HintAssist.Hint="ShopFloor Message"
-                                 Style="{StaticResource ReadOnlyBoxStyle}"
-                                 MinHeight="72"/>
-                    </Grid>
+                    <TextBox Grid.Row="3"
+                             Text="{Binding ResultMessage}"
+                             materialDesign:HintAssist.Hint="ShopFloor Message"
+                             Style="{StaticResource ReadOnlyBoxStyle}"
+                             MinHeight="72"/>
                 </Grid>
             </Border>
 

@@ -21,5 +21,7 @@ namespace ScanOutTool.Services
 
         (double X, double Y, double Width, double Height) GetResultElementBounds();
         bool IsScanoutUI();
+        bool ClickClear();
+        bool ClickTrace();
     }
 }

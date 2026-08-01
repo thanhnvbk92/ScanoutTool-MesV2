@@ -69,7 +69,15 @@ namespace ScanOutTool.Services
                 () => new AutoScanOutUI(_loggingService),
                 TimeSpan.FromSeconds(45),
                 "Attach to ShopFloor UI");
-            _loggingService.LogInformation("ShopFloor UI attached successfully.");
+
+            if (_autoScanOutUI.IsScanoutUI())
+            {
+                _loggingService.LogInformation("ShopFloor UI attached successfully.");
+            }
+            else
+            {
+                _loggingService.LogWarning("ShopFloor UI is open but ScanOut screen is not ready.");
+            }
         }
 
         public async Task RestartAsync()
@@ -89,12 +97,32 @@ namespace ScanOutTool.Services
                 () => new AutoScanOutUI(_loggingService),
                 TimeSpan.FromSeconds(45),
                 "Attach to ShopFloor UI");
-            _loggingService.LogInformation("ShopFloor UI attached successfully.");
+
+            if (_autoScanOutUI.IsScanoutUI())
+            {
+                _loggingService.LogInformation("ShopFloor UI attached successfully.");
+            }
+            else
+            {
+                _loggingService.LogWarning("ShopFloor UI is open but ScanOut screen is not ready.");
+            }
         }
 
         public bool IsScanoutUI()
         {
             return _autoScanOutUI?.IsScanoutUI() ?? false;
+        }
+
+        public bool ClickClear()
+        {
+            EnsureInitialized();
+            return _autoScanOutUI!.ClickClear();
+        }
+
+        public bool ClickTrace()
+        {
+            EnsureInitialized();
+            return _autoScanOutUI!.ClickTrace();
         }
 
         public ShopFloorScanResult ReadCurrent()

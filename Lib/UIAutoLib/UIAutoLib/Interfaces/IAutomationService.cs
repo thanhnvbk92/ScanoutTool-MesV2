@@ -7,6 +7,7 @@ namespace UIAutoLib.Interfaces
         bool AttachToProcess(string processName);
         string ReadTextByAutomationId(string automationId);
         bool ClickByAutomationId(string automationId);
+        bool ShowWindowByTitle(string title);
         string ReadTextByName(string elementName);
 
         (double X, double Y, double Width, double Height) GetElementBounds(string automationId);

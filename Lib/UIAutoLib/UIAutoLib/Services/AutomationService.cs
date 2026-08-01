@@ -34,6 +34,12 @@ namespace UIAutoLib.Services
         public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern bool IsWindowVisible(IntPtr hWnd);
 
         public const int SW_HIDE = 0;
@@ -263,6 +269,19 @@ namespace UIAutoLib.Services
                 }
             }
             return false;
+        }
+
+        public bool ClickByAutomationIdPreserveForeground(string automationId)
+        {
+            IntPtr previousForeground = GetForegroundWindow();
+            bool clicked = ClickByAutomationId(automationId);
+            if (clicked && previousForeground != IntPtr.Zero)
+            {
+                System.Threading.Thread.Sleep(100);
+                SetForegroundWindow(previousForeground);
+            }
+
+            return clicked;
         }
 
         public (double X, double Y, double Width, double Height) GetElementBounds(string automationId)
@@ -531,6 +550,31 @@ namespace UIAutoLib.Services
         {
             var dialog = _mainWindow.FindFirstChild(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Window));
             return dialog != null;
+        }
+
+        public bool ShowWindowByTitle(string title)
+        {
+            if (_app == null || _automation == null || string.IsNullOrWhiteSpace(title))
+            {
+                return false;
+            }
+
+            var window = _app.GetAllTopLevelWindows(_automation)
+                .FirstOrDefault(w => w.Title.IndexOf(title, System.StringComparison.OrdinalIgnoreCase) >= 0);
+            if (window == null)
+            {
+                return false;
+            }
+
+            IntPtr hwnd = (IntPtr)window.Properties.NativeWindowHandle.Value;
+            if (hwnd == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            ShowWindow(hwnd, SW_RESTORE);
+            SetForegroundWindow(hwnd);
+            return true;
         }
 
         private AutomationElement SearchRoot => _searchRoot ?? _mainWindow;

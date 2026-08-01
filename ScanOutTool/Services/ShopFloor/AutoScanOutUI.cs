@@ -21,6 +21,9 @@ namespace ScanOutTool.Services
         private string messageTextBoxName = "txtMessage";
         private string progressTextName = "txtProgress";
         private string processIDTextName = "txtPROCID";
+        private string clearButtonName = "btnClear";
+        private string traceButtonName = "btnLotHistory";
+        private string lotHistoryWindowTitle = "LOT History";
 
         private AutomationService automation;
         private AutomationService pendingAutomation;
@@ -44,7 +47,7 @@ namespace ScanOutTool.Services
             isAttached = AttachWhenReady(TimeSpan.FromSeconds(35));
             if (!isAttached)
             {
-                throw new Exception($"Failed to attach to ready ShopFloor UI. Please check App {processName}");
+                _loggingService.LogWarning($"Could not attach to ready ShopFloor UI. Please check App {processName} and open the ScanOut screen.");
             }
             _timer = new System.Timers.Timer(5000);
             _timer.Elapsed += TimerElapsed;
@@ -187,6 +190,12 @@ namespace ScanOutTool.Services
 
         private void TimerElapsed(object sender, ElapsedEventArgs e)
         {
+            if (automation == null)
+            {
+                isAttached = TryAttachToScanoutWindow(attempt: 1);
+                return;
+            }
+
             bool attachedProcessStillRunning = Process.GetProcessesByName(processName)
                 .Any(process => process.Id == automation.ProcessId);
             //_loggingService.LogInformation($"IsScanOut: {IsScanoutUI()}");
@@ -311,6 +320,45 @@ namespace ScanOutTool.Services
             }
         }
 
+        public bool ClickClear()
+        {
+            EnsureAttached();
+            return automation.ClickByAutomationIdPreserveForeground(clearButtonName);
+        }
+
+        public bool ClickTrace()
+        {
+            EnsureAttached();
+            if (automation.ShowWindowByTitle(lotHistoryWindowTitle))
+            {
+                _loggingService.LogInformation("LOT History window is already open. Brought it to front.");
+                return true;
+            }
+
+            if (!automation.ClickByAutomationIdPreserveForeground(traceButtonName))
+            {
+                return false;
+            }
+
+            return WaitAndShowLotHistoryWindow(TimeSpan.FromSeconds(2));
+        }
+
+        private bool WaitAndShowLotHistoryWindow(TimeSpan timeout)
+        {
+            var sw = Stopwatch.StartNew();
+            while (sw.Elapsed < timeout)
+            {
+                if (automation.ShowWindowByTitle(lotHistoryWindowTitle))
+                {
+                    return true;
+                }
+
+                Thread.Sleep(100);
+            }
+
+            return true;
+        }
+
         public IntPtr GetMainHandle()
         {
             if (isAttached)
@@ -371,7 +419,20 @@ namespace ScanOutTool.Services
 
         public bool IsScanoutUI()
         {
+            if (!isAttached || automation == null)
+            {
+                return false;
+            }
+
             return IsScanoutProcessId(automation.ReadTextByAutomationId(processIDTextName));
+        }
+
+        private void EnsureAttached()
+        {
+            if (!isAttached || automation == null)
+            {
+                throw new InvalidOperationException("ShopFloor UI is not attached.");
+            }
         }
 
         private static bool IsScanoutProcessId(string processId)

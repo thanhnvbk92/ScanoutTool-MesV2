@@ -37,6 +37,7 @@ namespace ScanOutTool.ViewModels
 
         private SerialProxyManager _serialProxyManager;
         private readonly HashSet<string> _skipWebSendPids = new(StringComparer.OrdinalIgnoreCase);
+        private bool _shouldClearShopFloorBeforeNextPid;
 
         private bool IsScanOutOnly => SelectedRunMode == RunMode.ScanOutOnly;
         private bool IsRescanOnly => SelectedRunMode == RunMode.RescanOnly;
@@ -160,6 +161,48 @@ namespace ScanOutTool.ViewModels
             }
         }
 
+        [RelayCommand]
+        private void ShopFloorClear()
+        {
+            ExecuteShopFloorButton("CLEAR", () =>
+            {
+                bool success = _shopFloorService.ClickClear();
+                if (success)
+                {
+                    _shouldClearShopFloorBeforeNextPid = false;
+                }
+
+                return success;
+            });
+        }
+
+        [RelayCommand]
+        private void ShopFloorTrace()
+        {
+            ExecuteShopFloorButton("TRACE", () => _shopFloorService.ClickTrace());
+        }
+
+        private void ExecuteShopFloorButton(string actionName, Func<bool> action)
+        {
+            try
+            {
+                bool success = action();
+                if (success)
+                {
+                    _loggingService.LogInformation($"ShopFloor {actionName} command executed.");
+                    return;
+                }
+
+                ShowWarningMessage($"Không thể thực hiện {actionName}. Vui lòng kiểm tra màn hình ShopFloor.");
+                _loggingService.LogWarning($"ShopFloor {actionName} command failed.");
+            }
+            catch (Exception ex)
+            {
+                ShowWarningMessage($"{actionName} lỗi: {ex.Message}");
+                _loggingService.LogError($"ShopFloor {actionName} error: {ex.Message}");
+            }
+        }
+
         public DashboardViewModel(
             ILoggingService loggingService,
             IConfigService configService,
@@ -258,6 +301,8 @@ namespace ScanOutTool.ViewModels
             }
 
             string pid = data.Trim();
+            PID = pid;
+
             bool skipWebSend = await IsBlockedByRfAsync(pid);
 
             HmesBlockAction hmesBlockAction = CheckHmesBlock(pid);
@@ -284,13 +329,20 @@ namespace ScanOutTool.ViewModels
                 return;
             }
 
+            if (!ClearShopFloorBeforeNextPidIfNeeded(pid))
+            {
+                return;
+            }
+
             await _serialProxyManager.SendToAppAsync(data);
             await ProcessShopFloorResultAfterForwardAsync(data);
         }
 
         private async Task<bool> TryHandleSpecialScannerDataAsync(string data)
         {
-            if (data.ToUpper().Contains("CHOOSE"))
+            string scannerCommand = data.Trim();
+
+            if (scannerCommand.Equals("CHOOSE", StringComparison.OrdinalIgnoreCase))
             {
                 IsInChooseEBRMode = !IsInChooseEBRMode;
                 InformationMessage = IsInChooseEBRMode ? "Vui lòng scan PCB PartNo mà bạn muốn Rescan" : "";
@@ -299,7 +351,7 @@ namespace ScanOutTool.ViewModels
                 return true;
             }
 
-            if (data.ToUpper().Contains("TRACE") && IsConfirmEBRStep)
+            if (scannerCommand.Equals("TRACE", StringComparison.OrdinalIgnoreCase) && IsConfirmEBRStep)
             {
                 SelectedEBR = _configService.Config.IsWOMode ? WorkOrder : PartNo;
                 InformationMessage = "";
@@ -307,11 +359,19 @@ namespace ScanOutTool.ViewModels
                 IsConfirmEBRStep = false;
                 IsInChooseEBRMode = false;
                 await SendDataExecuteAsync();
+                ExecuteShopFloorButton("TRACE", () => _shopFloorService.ClickTrace());
                 _loggingService.LogInformation($"[Event] {data} - Is in Choose Mode: {IsInChooseEBRMode}");
                 return true;
             }
 
-            if (data.ToUpper().Contains("CLEAR") && IsInChooseEBRMode)
+            if (scannerCommand.Equals("TRACE", StringComparison.OrdinalIgnoreCase))
+            {
+                ExecuteShopFloorButton("TRACE", () => _shopFloorService.ClickTrace());
+                _loggingService.LogInformation($"[Event] {data} - TRACE command handled by ShopFloor automation.");
+                return true;
+            }
+
+            if (scannerCommand.Equals("CLEAR", StringComparison.OrdinalIgnoreCase) && IsInChooseEBRMode)
             {
                 InformationMessage = "";
                 IsMessageOn = false;
@@ -321,9 +381,16 @@ namespace ScanOutTool.ViewModels
                 return true;
             }
 
-            if (!data.Contains("CLEAR") && !data.Contains("TRACE") && data.Trim().Length != 11 && data.Trim().Length != 22)
+            if (scannerCommand.Equals("CLEAR", StringComparison.OrdinalIgnoreCase))
             {
-                _loggingService.LogInformation($"[Event] {data.Trim()} - Data length: {data.Trim().Length}");
+                _shouldClearShopFloorBeforeNextPid = false;
+            }
+
+            if (!scannerCommand.Equals("CLEAR", StringComparison.OrdinalIgnoreCase)
+                && scannerCommand.Length != 11
+                && scannerCommand.Length != 22)
+            {
+                _loggingService.LogInformation($"[Event] {scannerCommand} - Data length: {scannerCommand.Length}");
                 return true;
             }
 
@@ -382,10 +449,47 @@ namespace ScanOutTool.ViewModels
             return _skipWebSendPids.Remove(pid.Trim());
         }
 
+        private bool ClearShopFloorBeforeNextPidIfNeeded(string pid)
+        {
+            if (!_shouldClearShopFloorBeforeNextPid)
+            {
+                return true;
+            }
+
+            try
+            {
+                _loggingService.LogInformation($"Previous ShopFloor result was NG. Executing CLEAR before PID {pid}.");
+                bool success = _shopFloorService.ClickClear();
+                if (success)
+                {
+                    _shouldClearShopFloorBeforeNextPid = false;
+                    return true;
+                }
+
+                ShowWarningMessage($"Không thể CLEAR ShopFloor trước khi gửi PID {pid}. Vui lòng kiểm tra ShopFloor.");
+                _loggingService.LogWarning($"Failed to execute CLEAR before PID {pid}.");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                ShowWarningMessage($"CLEAR trước PID {pid} lỗi: {ex.Message}");
+                _loggingService.LogError($"CLEAR before PID {pid} error: {ex.Message}");
+                return false;
+            }
+        }
+
         private static bool IsXrayBlock(string reason)
         {
-            return !string.IsNullOrWhiteSpace(reason)
-                && reason.IndexOf("Xray", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return false;
+            }
+
+            string normalizedReason = reason
+                .Replace("-", string.Empty)
+                .Replace(" ", string.Empty);
+
+            return normalizedReason.IndexOf("Xray", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private async Task ProcessShopFloorResultAfterForwardAsync(string sentData)
@@ -400,6 +504,8 @@ namespace ScanOutTool.ViewModels
             bool result = await ReadScanOutResult(sentData);
             if (!result)
             {
+                _shouldClearShopFloorBeforeNextPid = true;
+                _loggingService.LogWarning($"ShopFloor NG for PID {sentData.Trim()}. CLEAR will be executed before next PID.");
                 return;
             }
 
@@ -463,6 +569,12 @@ namespace ScanOutTool.ViewModels
             try
             {
                 await _shopFloorService.InitializeAsync();
+                if (!_shopFloorService.IsScanoutUI())
+                {
+                    ShowWarningMessage("ShopFloor chưa sẵn sàng. Vui lòng mở đúng màn ScanOut rồi bấm START lại.");
+                    _loggingService.LogWarning("ShopFloor UI is not on the ScanOut screen after initialization.");
+                    return false;
+                }
             }
             catch (Exception ex)
             {
@@ -583,10 +695,10 @@ namespace ScanOutTool.ViewModels
                     await RefreshHmesInfoAsync();
                 }
 
-                // 데이터 클리어 (설정에 따라)
+                // Dashboard keeps the last ShopFloor values visible for trace/debug.
                 if (_scanDataService.ShouldClearAfterSend)
                 {
-                    ClearInputFields();
+                    _loggingService.LogInformation("Auto clear after send is enabled, but ShopFloor display values are kept on dashboard.");
                 }
             }
             catch (Exception ex)
@@ -747,13 +859,6 @@ namespace ScanOutTool.ViewModels
         private static void ShowErrorDialog(string message)
         {
             MessageBox.Show(Application.Current.MainWindow, message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-
-        private void ClearInputFields()
-        {
-            WorkOrder = "";
-            PartNo = "";
-            PID = "";
         }
 
         private void OnDataExcuteStatusChanged(object sender, string status)
