@@ -42,9 +42,14 @@ namespace ScanOutTool.Services
 
 
         public AutoScanOutUI(ILoggingService loggingService)
+            : this(loggingService, TimeSpan.FromSeconds(30))
+        {
+        }
+
+        public AutoScanOutUI(ILoggingService loggingService, TimeSpan attachTimeout)
         {
             _loggingService = loggingService;
-            isAttached = AttachWhenReady(TimeSpan.FromSeconds(35));
+            isAttached = AttachWhenReady(attachTimeout);
             if (!isAttached)
             {
                 _loggingService.LogWarning($"Could not attach to ready ShopFloor UI. Please check App {processName} and open the ScanOut screen.");

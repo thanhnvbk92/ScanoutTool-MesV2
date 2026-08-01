@@ -89,6 +89,28 @@
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="Padding" Value="10"/>
         </Style>
+
+        <Style x:Key="ShopFloorMessageBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ReadOnlyBoxStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Result}" Value="OK">
+                    <Setter Property="Foreground" Value="#39D353"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Result}" Value="NG">
+                    <Setter Property="Foreground" Value="#FF4D4D"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="HmesMessageBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ReadOnlyBoxStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HmesResult}" Value="OK">
+                    <Setter Property="Foreground" Value="#39D353"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HmesResult}" Value="NG">
+                    <Setter Property="Foreground" Value="#FF4D4D"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </Page.Resources>
 
     <Grid Margin="8">
@@ -240,7 +262,7 @@
                     <TextBox Grid.Row="3"
                              Text="{Binding ResultMessage}"
                              materialDesign:HintAssist.Hint="ShopFloor Message"
-                             Style="{StaticResource ReadOnlyBoxStyle}"
+                             Style="{StaticResource ShopFloorMessageBoxStyle}"
                              Height="72"/>
                 </Grid>
             </Border>
@@ -345,7 +367,7 @@
                          <TextBox
                          Text="{Binding HmesMessage}"
                          materialDesign:HintAssist.Hint="HMES Message"
-                         Style="{StaticResource ReadOnlyBoxStyle}"
+                         Style="{StaticResource HmesMessageBoxStyle}"
                          Height="72"/>
                     </Grid>
                 </Grid>

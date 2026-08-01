@@ -63,7 +63,7 @@
                         <TextBlock Text="Luồng Xử Lý" Style="{StaticResource SectionTitleStyle}"/>
                         <TextBlock Text="1. Nhận PID từ scanner." Style="{StaticResource BodyTextStyle}"/>
                         <TextBlock Text="2. Xử lý mã đặc biệt như CHOOSE, TRACE, CLEAR." Style="{StaticResource BodyTextStyle}"/>
-                        <TextBlock Text="3. Kiểm tra RF block. Nếu có block thì vẫn có thể gửi ShopFloor nhưng bỏ gửi web." Style="{StaticResource BodyTextStyle}"/>
+                        <TextBlock Text="3. Kiểm tra RF block. Nếu có block thì dừng trước ShopFloor." Style="{StaticResource BodyTextStyle}"/>
                         <TextBlock Text="4. Kiểm tra HMES block. Nếu reason có Xray thì dừng trước ShopFloor." Style="{StaticResource BodyTextStyle}"/>
                         <TextBlock Text="5. Đọc kết quả ShopFloor, validate DB, gửi web HMES theo run mode." Style="{StaticResource BodyTextStyle}"/>
                     </StackPanel>

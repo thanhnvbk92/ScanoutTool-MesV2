@@ -12,6 +12,7 @@ namespace ScanOutTool.Services
         private readonly ILoggingService _loggingService;
         private readonly IConfigService _configService;
         private IAutoScanOutUI? _autoScanOutUI;
+        private static readonly TimeSpan AttachTimeout = TimeSpan.FromSeconds(30);
 
         public ShopFloorService(ILoggingService loggingService, IConfigService configService)
         {
@@ -64,19 +65,14 @@ namespace ScanOutTool.Services
             }
 
             await EnsureRunningAsync();
-            _loggingService.LogInformation("Attaching to ShopFloor UI...");
-            _autoScanOutUI = await RunWithTimeoutAsync(
-                () => new AutoScanOutUI(_loggingService),
-                TimeSpan.FromSeconds(45),
-                "Attach to ShopFloor UI");
-
-            if (_autoScanOutUI.IsScanoutUI())
+            try
             {
-                _loggingService.LogInformation("ShopFloor UI attached successfully.");
+                await AttachShopFloorUiAsync();
             }
-            else
+            catch (TimeoutException ex)
             {
-                _loggingService.LogWarning("ShopFloor UI is open but ScanOut screen is not ready.");
+                _loggingService.LogWarning($"{ex.Message} Restarting ShopFloor and retrying attach once.");
+                await RestartAsync();
             }
         }
 
@@ -92,10 +88,15 @@ namespace ScanOutTool.Services
 
             await Task.Delay(500);
             await EnsureRunningAsync();
+            await AttachShopFloorUiAsync();
+        }
+
+        private async Task AttachShopFloorUiAsync()
+        {
             _loggingService.LogInformation("Attaching to ShopFloor UI...");
             _autoScanOutUI = await RunWithTimeoutAsync(
-                () => new AutoScanOutUI(_loggingService),
-                TimeSpan.FromSeconds(45),
+                () => new AutoScanOutUI(_loggingService, AttachTimeout),
+                AttachTimeout + TimeSpan.FromSeconds(2),
                 "Attach to ShopFloor UI");
 
             if (_autoScanOutUI.IsScanoutUI())
@@ -105,6 +106,7 @@ namespace ScanOutTool.Services
             else
             {
                 _loggingService.LogWarning("ShopFloor UI is open but ScanOut screen is not ready.");
+                throw new TimeoutException($"Attach to ShopFloor UI timed out after {AttachTimeout.TotalSeconds:0}s.");
             }
         }
 

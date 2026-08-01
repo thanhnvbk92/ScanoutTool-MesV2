@@ -318,7 +318,10 @@ namespace ScanOutTool.ViewModels
             string pid = data.Trim();
             PID = pid;
 
-            bool skipWebSend = await IsBlockedByRfAsync(pid);
+            if (await IsBlockedByRfAsync(pid))
+            {
+                return;
+            }
 
             HmesBlockAction hmesBlockAction = CheckHmesBlock(pid);
             if (hmesBlockAction == HmesBlockAction.StopBeforeShopFloor)
@@ -326,11 +329,11 @@ namespace ScanOutTool.ViewModels
                 return;
             }
 
-            if (skipWebSend || hmesBlockAction == HmesBlockAction.SkipWebAfterShopFloor)
+            if (hmesBlockAction == HmesBlockAction.SkipWebAfterShopFloor)
             {
                 if (IsRescanOnly)
                 {
-                    _loggingService.LogWarning($"Bỏ qua gửi web/rescan cho PID {pid} do RF/HMES block trong Rescan only mode.");
+                    _loggingService.LogWarning($"Bỏ qua gửi web/rescan cho PID {pid} do HMES block trong Rescan only mode.");
                     return;
                 }
 
@@ -526,7 +529,7 @@ namespace ScanOutTool.ViewModels
 
             if (ShouldSkipWebSendAfterShopFloor(sentData))
             {
-                _loggingService.LogWarning($"PID {sentData.Trim()} bị RF/HMES block. Gửi DB HMES nhưng bỏ qua HMES web/rescan.");
+                _loggingService.LogWarning($"PID {sentData.Trim()} bị HMES block. Gửi DB HMES nhưng bỏ qua HMES web/rescan.");
                 await SendDataExecuteDatabaseOnlyAsync();
                 return;
             }
