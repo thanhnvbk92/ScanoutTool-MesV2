@@ -131,6 +131,7 @@ namespace ScanOutTool.ViewModels
                 {
                     IsSessionStarting = false;
                     StartBtnText = IsStarted ? "STOP" : "START";
+                    BringDashboardToFront();
                 }
             }
             else
@@ -525,7 +526,8 @@ namespace ScanOutTool.ViewModels
 
             if (ShouldSkipWebSendAfterShopFloor(sentData))
             {
-                _loggingService.LogWarning($"Bỏ qua gửi HMES/web/rescan cho PID {sentData.Trim()} do RF/HMES block.");
+                _loggingService.LogWarning($"PID {sentData.Trim()} bị RF/HMES block. Gửi DB HMES nhưng bỏ qua HMES web/rescan.");
+                await SendDataExecuteDatabaseOnlyAsync();
                 return;
             }
 
@@ -636,6 +638,28 @@ namespace ScanOutTool.ViewModels
             }
         }
 
+        private static void BringDashboardToFront()
+        {
+            Application.Current.Dispatcher.BeginInvoke(() =>
+            {
+                Window mainWindow = Application.Current.MainWindow;
+                if (mainWindow == null)
+                {
+                    return;
+                }
+
+                if (mainWindow.WindowState == WindowState.Minimized)
+                {
+                    mainWindow.WindowState = WindowState.Normal;
+                }
+
+                mainWindow.Topmost = true;
+                mainWindow.Activate();
+                mainWindow.Focus();
+                mainWindow.Topmost = false;
+            }, DispatcherPriority.ApplicationIdle);
+        }
+
         private async Task<bool> SendDataExecuteAsync()
         {
             bool finalResult = false;
@@ -727,6 +751,54 @@ namespace ScanOutTool.ViewModels
                 IsDataSending = false;
             }
             return finalResult;
+        }
+
+        private async Task<bool> SendDataExecuteDatabaseOnlyAsync()
+        {
+            if (IsInChooseEBRMode)
+            {
+                return false;
+            }
+
+            try
+            {
+                IsDataSending = true;
+                _loggingService.LogInformation($"Sending database-only HMES data: WorkOrder={WorkOrder}, ModelSuffix={PartNo}, WipSerialNumber={PID}");
+
+                ProcessResult result = await _scanDataService.ProcessDataAsync(
+                    WorkOrder,
+                    PartNo,
+                    PID,
+                    validateDatabase: true,
+                    transferToWeb: false);
+
+                if (!result.Success)
+                {
+                    if (!string.IsNullOrEmpty(result.ValidationResult))
+                    {
+                        _loggingService.LogError($"Validation Error: {result.ValidationResult}");
+                    }
+                    else
+                    {
+                        _loggingService.LogError($"Database-only HMES error: {result.Message}");
+                    }
+
+                    return false;
+                }
+
+                _loggingService.LogInformation($"Database-only HMES send successful for PID {PID}.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ResultMessage = $"Error: {ex.Message}";
+                _loggingService.LogError($"Error sending database-only HMES data: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                IsDataSending = false;
+            }
         }
 
         private async Task<ProcessResult> SendInWOMode()

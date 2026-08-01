@@ -10,8 +10,8 @@
             <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="18"/>
-            <Setter Property="Margin" Value="6"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="4"/>
         </Style>
 
         <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
@@ -23,7 +23,7 @@
 
         <Style x:Key="CaptionStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBodyLight}"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontSize" Value="14"/>
             <Setter Property="TextWrapping" Value="NoWrap"/>
         </Style>
 
@@ -31,7 +31,7 @@
             <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
             <Setter Property="FontSize" Value="20"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
             <Setter Property="Margin" Value="0,4,0,0"/>
         </Style>
 
@@ -47,19 +47,18 @@
         <Style x:Key="ShopFloorPrimaryInfoValueStyle" TargetType="TextBlock" BasedOn="{StaticResource ValueStyle}">
             <Setter Property="FontSize" Value="30"/>
             <Setter Property="FontWeight" Value="Black"/>
-            <Setter Property="MinHeight" Value="40"/>
-            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="MinHeight" Value="36"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
         </Style>
 
         <Style x:Key="LargeResultStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
-            <Setter Property="FontSize" Value="110"/>
+            <Setter Property="FontSize" Value="120"/>
             <Setter Property="FontWeight" Value="Black"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="TextAlignment" Value="Center"/>
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Result}" Value="OK">
                     <Setter Property="Foreground" Value="#39D353"/>
@@ -71,7 +70,6 @@
         </Style>
 
         <Style x:Key="HmesResultStyle" TargetType="TextBlock" BasedOn="{StaticResource ValueStyle}">
-            <Setter Property="FontSize" Value="36"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HmesResult}" Value="OK">
@@ -88,18 +86,19 @@
             <Setter Property="IsReadOnly" Value="True"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="VerticalContentAlignment" Value="Top"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="Padding" Value="10"/>
         </Style>
     </Page.Resources>
 
-    <Grid Margin="12">
+    <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="1.15*"/>
-            <RowDefinition Height="0.85*"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="200"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Style="{StaticResource SurfaceStyle}" Padding="14">
+        <Border Grid.Row="0" Style="{StaticResource SurfaceStyle}" Padding="5">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -110,26 +109,21 @@
 
                 <TextBox Grid.Column="0"
                          Text="{Binding SelectedEBR}"
-                         Width="210"
+                         Width="180"
                          Foreground="{DynamicResource MaterialDesignBody}"
                          Style="{StaticResource MaterialDesignFloatingHintTextBox}"
                          materialDesign:HintAssist.Hint="Selected EBR/WO"
-                         Margin="0,0,14,0"/>
+                         Margin="0,0,10,0"/>
 
                 <ComboBox Grid.Column="1"
                           SelectedItem="{Binding SelectedRunMode}"
                           ItemsSource="{Binding RunModes}"
-                          Width="190"
+                          Width="165"
                           Foreground="{DynamicResource MaterialDesignBody}"
                           Style="{StaticResource MaterialDesignFloatingHintComboBox}"
                           materialDesign:HintAssist.Hint="Run Mode"/>
 
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="HMES web runs normally. Dashboard shows ShopFloor and HMES data."
-                               Foreground="{DynamicResource MaterialDesignBodyLight}"
-                               FontSize="12"
-                               VerticalAlignment="Center"
-                               Margin="0,0,16,0"/>
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">                    
                     <Button Content="{Binding StartBtnText}"
                             Command="{Binding StartCommand}"
                             MinWidth="120"
@@ -144,7 +138,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.18*"/>
                 <ColumnDefinition Width="0.82*"/>
-            </Grid.ColumnDefinitions>
+            </Grid.ColumnDefinitions>          
 
             <Border Grid.Column="0" Style="{StaticResource SurfaceStyle}">
                 <Grid>
@@ -152,7 +146,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="80"/>
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0">
@@ -189,32 +183,57 @@
                         </StackPanel>
                     </Grid>
 
-                    <UniformGrid Grid.Row="1" Columns="3" Rows="1" Margin="0,18,0,8">
+                    <UniformGrid Grid.Row="1" Columns="3" Rows="1" Margin="0,14,0,8">
                         <StackPanel Margin="0,0,14,0">
                             <TextBlock Text="PID" Style="{StaticResource CaptionStyle}"/>
-                            <TextBlock Text="{Binding PID}" Style="{StaticResource ShopFloorInfoValueStyle}"/>
+                            <Viewbox Stretch="Uniform"
+                                     StretchDirection="Both"
+                                     HorizontalAlignment="Left"
+                                     MaxHeight="30">
+                                <TextBlock Text="{Binding PID}" Style="{StaticResource ShopFloorInfoValueStyle}"/>
+                            </Viewbox>
                         </StackPanel>
+
                         <StackPanel Margin="0,0,14,0">
                             <TextBlock Text="Part No" Style="{StaticResource CaptionStyle}"/>
-                            <TextBlock Text="{Binding PartNo}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
+                            <Viewbox Stretch="Uniform"
+                                     StretchDirection="Both"
+                                     HorizontalAlignment="Left"
+                                     MaxHeight="40">
+                                <TextBlock Text="{Binding PartNo}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
+                            </Viewbox>
                         </StackPanel>
+
                         <StackPanel>
                             <TextBlock Text="Work Order" Style="{StaticResource CaptionStyle}"/>
-                            <TextBlock Text="{Binding WorkOrder}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
+                            <Viewbox Stretch="Uniform"
+                                     StretchDirection="Both"
+                                     HorizontalAlignment="Left"
+                                     MaxHeight="40">
+                                <TextBlock Text="{Binding WorkOrder}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
+                            </Viewbox>
                         </StackPanel>
                     </UniformGrid>
-
                     <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Result}" Style="{StaticResource LargeResultStyle}"/>
-                        <StackPanel HorizontalAlignment="Center" Margin="0,-8,0,4">
-                            <TextBlock Text="Progress" Style="{StaticResource CaptionStyle}" HorizontalAlignment="Center"/>
-                            <TextBlock Text="{Binding Progress}"
-                                       Foreground="{DynamicResource MaterialDesignBody}"
-                                       FontSize="34"
-                                       FontWeight="Bold"
-                                       HorizontalAlignment="Center"
-                                       TextAlignment="Center"
-                                       TextTrimming="CharacterEllipsis"/>
+                        <Viewbox Stretch="Uniform"
+                                 StretchDirection="Both"
+                                 HorizontalAlignment="Center"
+                                 MaxHeight="200">
+                            <TextBlock Text="{Binding Result}" Style="{StaticResource LargeResultStyle}"/>
+                        </Viewbox>
+                        <StackPanel HorizontalAlignment="Center" Margin="0,-8,0,4">                           
+                            <Viewbox Stretch="Uniform"
+                                     StretchDirection="Both"
+                                     MaxHeight="40"
+                                     HorizontalAlignment="Center">
+                                <TextBlock Text="{Binding Progress}"
+                                           Foreground="{DynamicResource MaterialDesignBody}"
+                                           FontSize="34"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Center"
+                                           TextAlignment="Center"
+                                           TextWrapping="NoWrap"/>
+                            </Viewbox>
                         </StackPanel>
                     </StackPanel>
 
@@ -222,7 +241,7 @@
                              Text="{Binding ResultMessage}"
                              materialDesign:HintAssist.Hint="ShopFloor Message"
                              Style="{StaticResource ReadOnlyBoxStyle}"
-                             MinHeight="72"/>
+                             Height="72"/>
                 </Grid>
             </Border>
 
@@ -230,8 +249,9 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="80"/>
                     </Grid.RowDefinitions>
 
                     <Grid Grid.Row="0">
@@ -262,7 +282,13 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Margin="0,0,18,0">
                             <TextBlock Text="Result" Style="{StaticResource CaptionStyle}"/>
-                            <TextBlock Text="{Binding HmesResult}" Style="{StaticResource HmesResultStyle}"/>
+                            <Viewbox Stretch="Uniform"
+                                     StretchDirection="Both"
+                                     HorizontalAlignment="Left"     
+                                     VerticalAlignment="Stretch"
+                                     MaxHeight="80">
+                                <TextBlock Text="{Binding HmesResult}" Style="{StaticResource HmesResultStyle}"/>
+                            </Viewbox>
                         </StackPanel>
                         <StackPanel Grid.Column="1">
                             <TextBlock Text="Sending" Style="{StaticResource CaptionStyle}"/>
@@ -277,31 +303,56 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <UniformGrid Grid.Row="0" Columns="3" Rows="1" Margin="0,0,0,14">
-                            <StackPanel Margin="0,0,12,0">
-                                <TextBlock Text="Pack Qty" Style="{StaticResource CaptionStyle}"/>
-                                <TextBlock Text="{Binding HmesPackQty}" Style="{StaticResource ValueStyle}"/>
-                            </StackPanel>
-                            <StackPanel Margin="0,0,12,0">
-                                <TextBlock Text="Magazine QPM" Style="{StaticResource CaptionStyle}"/>
-                                <TextBlock Text="{Binding HmesMagazineQty}" Style="{StaticResource ValueStyle}"/>
-                            </StackPanel>
-                            <StackPanel>
-                                <TextBlock Text="Magazine No" Style="{StaticResource CaptionStyle}"/>
-                                <TextBlock Text="{Binding HmesMagazineNo}" Style="{StaticResource CompactValueStyle}"/>
-                            </StackPanel>
-                        </UniformGrid>
+                        <Grid Grid.Row="0" Margin="0,0,0,14">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                        <TextBox Grid.Row="1"
-                                 Text="{Binding HmesMessage}"
-                                 materialDesign:HintAssist.Hint="HMES Message"
-                                 Style="{StaticResource ReadOnlyBoxStyle}"/>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Pack Qty" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="0"
+                                       Text="{Binding HmesPackQty}"
+                                       Style="{StaticResource ValueStyle}"
+                                       HorizontalAlignment="Left"
+                                       TextAlignment="Left"/>
+
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Magazine QPM" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="1"
+                                       Text="{Binding HmesMagazineQty}"
+                                       Style="{StaticResource ValueStyle}"
+                                       HorizontalAlignment="Left"
+                                       TextAlignment="Left"/>
+
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="Magazine No" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="1"
+                                       Grid.Column="2"
+                                       Text="{Binding HmesMagazineNo}"
+                                       Style="{StaticResource CompactValueStyle}"
+                                       HorizontalAlignment="Left"
+                                       TextAlignment="Left"/>
+                        </Grid>
+
+                        
+                    </Grid>
+                    <Grid Grid.Row="3">
+                         <TextBox
+                         Text="{Binding HmesMessage}"
+                         materialDesign:HintAssist.Hint="HMES Message"
+                         Style="{StaticResource ReadOnlyBoxStyle}"
+                         Height="72"/>
                     </Grid>
                 </Grid>
             </Border>
         </Grid>
 
-        <Border Grid.Row="2" Style="{StaticResource SurfaceStyle}">
+        <Border Grid.Row="2" Style="{StaticResource SurfaceStyle}" Margin="4">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -324,6 +375,7 @@
                              FontSize="12"
                              IsReadOnly="True"
                              BorderThickness="0"
+                             MinHeight="30"
                              VerticalScrollBarVisibility="Auto"
                              HorizontalScrollBarVisibility="Visible"
                              TextChanged="LogTextBox_TextChanged"
@@ -335,12 +387,13 @@
                             BorderBrush="#FFFFD000"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Padding="16"
+                            Padding="14"
                             VerticalAlignment="Top"
-                            Margin="10">
+                            Margin="10"
+                            MinHeight="72">
                         <TextBlock Text="{Binding InformationMessage}"
                                    Foreground="Yellow"
-                                   FontSize="22"
+                                   FontSize="20"
                                    FontWeight="Bold"
                                    TextWrapping="Wrap"/>
                     </Border>
