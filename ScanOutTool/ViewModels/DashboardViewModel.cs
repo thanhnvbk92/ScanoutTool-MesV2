@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace ScanOutTool.ViewModels
 {
@@ -37,7 +38,9 @@ namespace ScanOutTool.ViewModels
 
         private SerialProxyManager _serialProxyManager;
         private readonly HashSet<string> _skipWebSendPids = new(StringComparer.OrdinalIgnoreCase);
+        private readonly DispatcherTimer _hmesRefreshTimer = new();
         private bool _shouldClearShopFloorBeforeNextPid;
+        private bool _isRefreshingHmesInfo;
 
         private bool IsScanOutOnly => SelectedRunMode == RunMode.ScanOutOnly;
         private bool IsRescanOnly => SelectedRunMode == RunMode.RescanOnly;
@@ -77,6 +80,14 @@ namespace ScanOutTool.ViewModels
         partial void OnIsStartedChanged(bool value)
         {
             StartBtnText = value ? "STOP" : "START";
+            if (value)
+            {
+                StartHmesRefreshTimer();
+            }
+            else
+            {
+                StopHmesRefreshTimer();
+            }
         }
 
 
@@ -221,6 +232,9 @@ namespace ScanOutTool.ViewModels
             _audioNotificationService = audioNotificationService;
             _shopFloorService = shopFloorService;
             _scanDataService = scanDataService;
+
+            _hmesRefreshTimer.Interval = TimeSpan.FromSeconds(2);
+            _hmesRefreshTimer.Tick += async (_, _) => await RefreshHmesInfoFromTimerAsync();
 
             _loggingService.OnNewLog += LoggerService_OnNewLog;
 
@@ -853,6 +867,42 @@ namespace ScanOutTool.ViewModels
             catch (Exception ex)
             {
                 _loggingService.LogWarning($"Failed to refresh HMES info: {ex.Message}");
+            }
+        }
+
+        private void StartHmesRefreshTimer()
+        {
+            if (!_hmesRefreshTimer.IsEnabled)
+            {
+                _hmesRefreshTimer.Start();
+            }
+        }
+
+        private void StopHmesRefreshTimer()
+        {
+            if (_hmesRefreshTimer.IsEnabled)
+            {
+                _hmesRefreshTimer.Stop();
+            }
+
+            _isRefreshingHmesInfo = false;
+        }
+
+        private async Task RefreshHmesInfoFromTimerAsync()
+        {
+            if (!IsStarted || IsDataSending || _isRefreshingHmesInfo)
+            {
+                return;
+            }
+
+            try
+            {
+                _isRefreshingHmesInfo = true;
+                await RefreshHmesInfoAsync();
+            }
+            finally
+            {
+                _isRefreshingHmesInfo = false;
             }
         }
 
