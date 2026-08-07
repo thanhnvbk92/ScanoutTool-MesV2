@@ -13,6 +13,7 @@ namespace ScanOutTool.Services
         private readonly IConfigService _configService;
         private IAutoScanOutUI? _autoScanOutUI;
         private static readonly TimeSpan AttachTimeout = TimeSpan.FromSeconds(30);
+        private ShopFloorScanResult _lastResult = new ShopFloorScanResult();
 
         public ShopFloorService(ILoggingService loggingService, IConfigService configService)
         {
@@ -149,38 +150,109 @@ namespace ScanOutTool.Services
             pid = pid.Trim();
             var sw = Stopwatch.StartNew();
 
-            while (pid != _autoScanOutUI!.ReadPID())
+            // 1. Capture initial ShopFloor state (lấy kết quả của lần đọc trước, mặc định rỗng khi mới khởi động)
+            ShopFloorScanResult initialState = _lastResult;
+            string initialPid = initialState.PID.Trim();
+            string initialWO = initialState.WorkOrder.Trim();
+            string initialPartNo = initialState.PartNo.Trim();
+            string initialResult = initialState.Result.Trim();
+            string initialMessage = initialState.Message.Trim();
+            string initialProgress = initialState.Progress.Trim();
+
+            _loggingService.LogInformation($"[ShopFloor] Waiting for PID update: Target='{pid}', Previous Scan PID='{initialPid}'");
+
+            // 2. Phase 1: Wait until ShopFloor PID updates to match scanned target PID
+            bool pidUpdatedOnShopFloor = false;
+            while (sw.ElapsedMilliseconds < timeoutMs)
             {
-                string currentPid = _autoScanOutUI.ReadPID();
+                string currentPid = _autoScanOutUI!.ReadPID().Trim();
                 string message = _autoScanOutUI.ReadMessage();
 
                 if (currentPid.Contains("PLZ Read below Message and Clear") && message.Contains(pid))
                 {
-                    return new ShopFloorScanResult
+                    _loggingService.LogWarning($"[ShopFloor] Popup message detected for PID '{pid}': {message}");
+                    _lastResult = new ShopFloorScanResult
                     {
                         PID = pid,
                         Result = "NG",
                         Progress = _autoScanOutUI.ReadProgress(),
                         Message = message
                     };
+                    return _lastResult;
                 }
 
-                if (sw.ElapsedMilliseconds > timeoutMs)
+                if (string.Equals(currentPid, pid, StringComparison.OrdinalIgnoreCase))
                 {
-                    _loggingService.LogError($"Timeout to get scanout PID {pid} result: {currentPid} - {message}:{sw.ElapsedMilliseconds}ms");
-                    return new ShopFloorScanResult
-                    {
-                        PID = pid,
-                        Result = "NG",
-                        Progress = _autoScanOutUI.ReadProgress(),
-                        Message = message
-                    };
+                    pidUpdatedOnShopFloor = true;
+                    break;
                 }
 
                 await Task.Delay(50);
             }
 
-            return ReadCurrent();
+            if (!pidUpdatedOnShopFloor)
+            {
+                string currentPid = _autoScanOutUI!.ReadPID().Trim();
+                string message = _autoScanOutUI.ReadMessage();
+                _loggingService.LogError($"[ShopFloor] Timeout waiting for PID to update on UI. Expected: '{pid}', Found: '{currentPid}' - Message: '{message}' ({sw.ElapsedMilliseconds}ms)");
+                _lastResult = new ShopFloorScanResult
+                {
+                    PID = pid,
+                    Result = "NG",
+                    Progress = _autoScanOutUI.ReadProgress(),
+                    Message = $"Timeout: PID on ShopFloor ('{currentPid}') did not update to target PID ('{pid}')."
+                };
+                return _lastResult;
+            }
+
+            // 3. Phase 2: Once PID matches on ShopFloor, wait for ShopFloor response fields to update/stabilize
+            _loggingService.LogInformation($"[ShopFloor] PID updated to '{pid}' on UI at {sw.ElapsedMilliseconds}ms. Verifying response data...");
+
+            ShopFloorScanResult latestResult = ReadCurrent();
+
+            while (sw.ElapsedMilliseconds < timeoutMs)
+            {
+                latestResult = ReadCurrent();
+                bool isResponseUpdated = false;
+
+                bool pidMatches = string.Equals(latestResult.PID.Trim(), pid, StringComparison.OrdinalIgnoreCase);
+                bool hasResult = !string.IsNullOrWhiteSpace(latestResult.Result);
+
+                bool initialWasEmpty = string.IsNullOrWhiteSpace(initialPid) && string.IsNullOrWhiteSpace(initialResult);
+                bool pidChanged = !string.Equals(initialPid, pid, StringComparison.OrdinalIgnoreCase);
+                bool resultChanged = !string.Equals(latestResult.Result.Trim(), initialResult, StringComparison.OrdinalIgnoreCase);
+                bool progressChanged = !string.Equals(latestResult.Progress.Trim(), initialProgress, StringComparison.OrdinalIgnoreCase);
+                bool messageChanged = !string.Equals(latestResult.Message.Trim(), initialMessage, StringComparison.OrdinalIgnoreCase);
+
+                // Dữ liệu sẵn sàng khi PID trên UI khớp với target PID và đã có Result ("OK"/"NG")
+                if (pidMatches && hasResult && (initialWasEmpty || pidChanged || resultChanged || progressChanged || messageChanged))
+                {
+                    isResponseUpdated = true;
+                }
+                else if (pidMatches && hasResult)
+                {
+                    isResponseUpdated = true;
+                }
+
+                if (isResponseUpdated && !string.IsNullOrWhiteSpace(latestResult.Result))
+                {
+                    await Task.Delay(100);
+                    ShopFloorScanResult stableResult = ReadCurrent();
+                    if (string.Equals(stableResult.PID.Trim(), pid, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(stableResult.Result, latestResult.Result, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _loggingService.LogInformation($"[ShopFloor] Verified PID '{pid}' response: Result='{stableResult.Result}', WO='{stableResult.WorkOrder}', PartNo='{stableResult.PartNo}' in {sw.ElapsedMilliseconds}ms");
+                        _lastResult = stableResult;
+                        return stableResult;
+                    }
+                }
+
+                await Task.Delay(50);
+            }
+
+            _loggingService.LogWarning($"[ShopFloor] Response fields for PID '{pid}' did not change/stabilize before timeout ({sw.ElapsedMilliseconds}ms). Returning current state.");
+            _lastResult = latestResult;
+            return latestResult;
         }
 
         private void EnsureInitialized()
@@ -198,7 +270,7 @@ namespace ScanOutTool.Services
                 string expectedProcessName = Path.GetFileNameWithoutExtension(exePath);
                 string expectedFullPath = Path.GetFullPath(exePath);
 
-                return Process.GetProcesses()
+                return Process.GetProcessesByName(expectedProcessName)
                     .Any(process => IsExpectedProcess(process, expectedProcessName, expectedFullPath));
             }
 
@@ -212,7 +284,7 @@ namespace ScanOutTool.Services
                 string expectedProcessName = Path.GetFileNameWithoutExtension(exePath);
                 string expectedFullPath = Path.GetFullPath(exePath);
 
-                return Process.GetProcesses()
+                return Process.GetProcessesByName(expectedProcessName)
                     .Where(process => IsExpectedProcess(process, expectedProcessName, expectedFullPath))
                     .ToArray();
             }

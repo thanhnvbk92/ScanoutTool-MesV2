@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataExcuter;
 using ScanOutLogLib.Services;
@@ -15,6 +15,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+
+using System.IO;
+using Newtonsoft.Json;
+using System.Threading;
+using System.Threading.Channels;
 
 namespace ScanOutTool.ViewModels
 {
@@ -41,6 +46,14 @@ namespace ScanOutTool.ViewModels
         private readonly DispatcherTimer _hmesRefreshTimer = new();
         private bool _shouldClearShopFloorBeforeNextPid;
         private bool _isRefreshingHmesInfo;
+        private readonly System.Threading.SemaphoreSlim _scanProcessingLock = new(1, 1);
+        private string _lastScannedPid = string.Empty;
+        private DateTime _lastScannedTime = DateTime.MinValue;
+        private const int DuplicateScanThresholdMs = 3000;
+
+        private readonly Channel<string> _scanQueue = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        private CancellationTokenSource? _queueCts;
+        private Task? _queueConsumerTask;
 
         private bool IsScanOutOnly => SelectedRunMode == RunMode.ScanOutOnly;
         private bool IsRescanOnly => SelectedRunMode == RunMode.RescanOnly;
@@ -56,6 +69,29 @@ namespace ScanOutTool.ViewModels
         [ObservableProperty] private bool isPCBtoSelectEBR = false;
         [ObservableProperty] private bool isConfirmEBRStep = false;
         [ObservableProperty] private bool isDataSending;
+        [ObservableProperty] private bool isSkipHmesWeb;
+
+        partial void OnIsSkipHmesWebChanged(bool value)
+        {
+            UpdateRunModes();
+        }
+
+        private void UpdateRunModes()
+        {
+            if (IsSkipHmesWeb)
+            {
+                RunModes = new List<RunMode> { RunMode.ScanOutOnly };
+                SelectedRunMode = RunMode.ScanOutOnly;
+            }
+            else
+            {
+                RunModes = Enum.GetValues(typeof(RunMode)).Cast<RunMode>().ToList();
+                if (SelectedRunMode == RunMode.None || !RunModes.Contains(SelectedRunMode))
+                {
+                    SelectedRunMode = RunMode.ScanOut_Rescan;
+                }
+            }
+        }
         [ObservableProperty] private string logs;
         [ObservableProperty] private string startBtnText;
         [ObservableProperty] private string pID;
@@ -76,11 +112,160 @@ namespace ScanOutTool.ViewModels
         [ObservableProperty] private int hmesPackQty;
         [ObservableProperty] private int hmesMagazineQty;
         [ObservableProperty] private string hmesMagazineNo;
+        [ObservableProperty] private string hmesTransactionType = "NORMAL";
+        [ObservableProperty] private bool isTransactionTypeNormal = true;
+        [ObservableProperty] private bool isTransactionTypeCancel = false;
+        [ObservableProperty] private bool isManualMagazineInputFocused;
+        [ObservableProperty] private string inputMagazineNo = string.Empty;
+        [ObservableProperty] private System.Collections.ObjectModel.ObservableCollection<SavedMagazineItem> savedMagazines = new();
+        [ObservableProperty] private SavedMagazineItem selectedSavedMagazine;
+
+        partial void OnSelectedSavedMagazineChanged(SavedMagazineItem value)
+        {
+            if (value != null && !string.IsNullOrEmpty(value.MagazineNo))
+            {
+                InputMagazineNo = value.MagazineNo;
+            }
+        }
+
+        partial void OnInformationMessageChanged(string value)
+        {
+            IsMessageOn = !string.IsNullOrWhiteSpace(value);
+        }
+
+        [RelayCommand]
+        private void ClearMagazine(SavedMagazineItem item)
+        {
+            if (item != null && SavedMagazines.Contains(item))
+            {
+                SavedMagazines.Remove(item);
+                _loggingService.LogInformation($"Xóa Magazine No '{item.MagazineNo}' khỏi danh sách đã lưu.");
+                SaveSavedMagazines();
+            }
+        }
+
+        [RelayCommand]
+        private void ClearAllMagazines()
+        {
+            if (SavedMagazines.Count > 0)
+            {
+                SavedMagazines.Clear();
+                _loggingService.LogInformation("Đã xóa tất cả Magazine No đã lưu.");
+                SaveSavedMagazines();
+            }
+        }
+
+        private void AddCurrentMagazineToSavedList()
+        {
+            if (string.IsNullOrWhiteSpace(HmesMagazineNo)) return;
+
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                var existing = SavedMagazines.FirstOrDefault(x => x.MagazineNo.Equals(HmesMagazineNo, StringComparison.OrdinalIgnoreCase));
+                if (existing != null)
+                {
+                    existing.Qty = HmesPackQty;
+                    existing.Qpm = HmesMagazineQty;
+                    existing.SavedTime = DateTime.Now;
+                }
+                else
+                {
+                    SavedMagazines.Insert(0, new SavedMagazineItem
+                    {
+                        MagazineNo = HmesMagazineNo,
+                        Qty = HmesPackQty,
+                        Qpm = HmesMagazineQty,
+                        SavedTime = DateTime.Now
+                    });
+                }
+                SaveSavedMagazines();
+            });
+        }
+
+        private string GetSavedMagazinesFilePath()
+        {
+            string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? AppDomain.CurrentDomain.BaseDirectory;
+            string exeDirectory = Path.GetDirectoryName(exePath) ?? AppDomain.CurrentDomain.BaseDirectory;
+            string resourcesDir = Path.Combine(exeDirectory, "Resources");
+            if (!Directory.Exists(resourcesDir))
+            {
+                Directory.CreateDirectory(resourcesDir);
+            }
+            return Path.Combine(resourcesDir, "saved_magazines.json");
+        }
+
+        private void LoadSavedMagazines()
+        {
+            try
+            {
+                string filePath = GetSavedMagazinesFilePath();
+                if (File.Exists(filePath))
+                {
+                    string json = File.ReadAllText(filePath);
+                    var items = JsonConvert.DeserializeObject<List<SavedMagazineItem>>(json);
+                    if (items != null)
+                    {
+                        Application.Current?.Dispatcher?.Invoke(() =>
+                        {
+                            SavedMagazines.Clear();
+                            foreach (var item in items)
+                            {
+                                SavedMagazines.Add(item);
+                            }
+                        });
+                        _loggingService.LogInformation($"[Persistence] Đã tải {items.Count} magazine đã lưu từ file.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[Persistence] Lỗi khi tải magazine từ file: {ex.Message}");
+            }
+        }
+
+        private void SaveSavedMagazines()
+        {
+            try
+            {
+                string filePath = GetSavedMagazinesFilePath();
+                List<SavedMagazineItem> items;
+                lock (SavedMagazines)
+                {
+                    items = SavedMagazines.ToList();
+                }
+                string json = JsonConvert.SerializeObject(items, Formatting.Indented);
+                File.WriteAllText(filePath, json);
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[Persistence] Lỗi khi lưu magazine ra file: {ex.Message}");
+            }
+        }
+
+        partial void OnIsTransactionTypeNormalChanged(bool value)
+        {
+            if (value)
+            {
+                IsTransactionTypeCancel = false;
+                HmesTransactionType = "NORMAL";
+                _ = Task.Run(() => _scanDataService.SetTransactionTypeAsync("NORMAL"));
+            }
+        }
+
+        partial void OnIsTransactionTypeCancelChanged(bool value)
+        {
+            if (value)
+            {
+                IsTransactionTypeNormal = false;
+                HmesTransactionType = "CANCEL";
+                _ = Task.Run(() => _scanDataService.SetTransactionTypeAsync("CANCEL"));
+            }
+        }
 
         partial void OnIsStartedChanged(bool value)
         {
             StartBtnText = value ? "STOP" : "START";
-            if (value)
+            if (value && !IsSkipHmesWeb)
             {
                 StartHmesRefreshTimer();
             }
@@ -92,24 +277,46 @@ namespace ScanOutTool.ViewModels
 
 
         [RelayCommand]
-        private async  Task Start()
+        private async Task Start()
         {
             if (!IsStarted)
             {
                 IsSessionStarting = true;
                 StartBtnText = "STARTING...";
 
+                await Task.Yield();
+
                 try
                 {
-                    ShopFloorExePath = _configService.Config.ShopFloorExePath;
-                    KillProcess.KillChromeAndDriver();
+                    bool startSuccess = await Task.Run(async () =>
+                    {
+                        ShopFloorExePath = _configService.Config.ShopFloorExePath;
+                        IsSkipHmesWeb = _configService.Config.SkipHmesWeb;
+                        UpdateRunModes();
 
-                    bool[] initResults = await Task.WhenAll(
-                        InitScanOutUIAndReadAsync(),
-                        StartDataExecuteSessionAsync()
-                    );
+                        if (!IsSkipHmesWeb)
+                        {
+                            KillProcess.KillChromeAndDriver();
+                        }
 
-                    if (initResults.All(result => result))
+                        bool[] initResults;
+                        if (IsSkipHmesWeb)
+                        {
+                            _loggingService.LogInformation("Chế độ Skip HMES Web được bật: Bỏ qua khởi tạo trình duyệt Chrome.");
+                            initResults = new bool[] { await InitScanOutUIAndReadAsync(), true };
+                        }
+                        else
+                        {
+                            initResults = await Task.WhenAll(
+                                InitScanOutUIAndReadAsync(),
+                                StartDataExecuteSessionAsync()
+                            );
+                        }
+
+                        return initResults.All(result => result);
+                    });
+
+                    if (startSuccess)
                     {
                         _appState.IsRunning = true;
                         IsStarted = true;
@@ -136,12 +343,14 @@ namespace ScanOutTool.ViewModels
             }
             else
             {                
-                
                 IsStarted = false;
                 _appState.IsRunning = false;
                 StopSerialProxy();
-
             }
+        }
+
+        partial void OnHmesMagazineNoChanged(string value)
+        {
         }
 
         [RelayCommand]
@@ -166,6 +375,78 @@ namespace ScanOutTool.ViewModels
             {
                 ShowWarningMessage($"Manual Print lỗi: {ex.Message}");
                 _loggingService.LogError($"Manual print error: {ex.Message}");
+            }
+            finally
+            {
+                IsDataSending = false;
+            }
+        }
+
+        [RelayCommand]
+        private async Task SaveLabel()
+        {
+            try
+            {
+                IsDataSending = true;
+                // Thêm ngay thông tin Magazine hiện tại vào danh sách không cần đợi web
+                AddCurrentMagazineToSavedList();
+
+                bool success = await _scanDataService.SaveLabelAsync();
+
+                if (success)
+                {
+                    await RefreshHmesInfoAsync();
+                    _loggingService.LogInformation("Lưu tem thành công và đã làm mới trang HMES web.");
+                }
+                else
+                {
+                    ShowWarningMessage("Không thể Lưu tem. Vui lòng kiểm tra trang HMES web.");
+                    _loggingService.LogWarning("Save label command failed.");
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowWarningMessage($"Lưu tem lỗi: {ex.Message}");
+                _loggingService.LogError($"Save label error: {ex.Message}");
+            }
+            finally
+            {
+                IsDataSending = false;
+            }
+        }
+
+        [RelayCommand]
+        private async Task SendMagazineNo()
+        {
+            if (string.IsNullOrWhiteSpace(InputMagazineNo))
+            {
+                ShowWarningMessage("Vui lòng nhập Magazine No trước khi nhấn Send.");
+                return;
+            }
+
+            try
+            {
+                IsDataSending = true;
+                string targetMagNo = InputMagazineNo.Trim();
+                InputMagazineNo = string.Empty;
+                _loggingService.LogInformation($"Gửi Magazine No '{targetMagNo}' sang HMES Web...");
+                bool success = await _scanDataService.SearchMagazineNoAsync(targetMagNo);
+
+                if (success)
+                {
+                    await RefreshHmesInfoAsync();
+                    _loggingService.LogInformation($"Tìm kiếm và chọn Magazine No '{targetMagNo}' thành công trên HMES Web.");
+                }
+                else
+                {
+                    ShowWarningMessage($"Không thể tìm kiếm Magazine No '{targetMagNo}'. Vui lòng kiểm tra trang HMES Web.");
+                    _loggingService.LogWarning($"Tìm kiếm Magazine No '{targetMagNo}' thất bại.");
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowWarningMessage($"Gửi Magazine No lỗi: {ex.Message}");
+                _loggingService.LogError($"Gửi Magazine No error: {ex.Message}");
             }
             finally
             {
@@ -242,6 +523,9 @@ namespace ScanOutTool.ViewModels
             _loggingService.LogInformation("Initializing DashboardViewModel...");
 
             InitializeServices();
+
+            //IsMessageOn=true;
+            //InformationMessage = "fshkfshfkshfskfhskfhs\r\ndadsadadsd";
         }
 
         private void InitializeServices()
@@ -252,8 +536,10 @@ namespace ScanOutTool.ViewModels
 
             _scanDataService.StatusChanged += OnDataExcuteStatusChanged;
 
-            RunModes = Enum.GetValues(typeof(RunMode)).Cast<RunMode>().ToList();
-            SelectedRunMode = RunMode.ScanOut_Rescan;
+            IsSkipHmesWeb = _configService.Config.SkipHmesWeb;
+            UpdateRunModes();
+
+            LoadSavedMagazines();
         }
 
         private void LoggerService_OnNewLog(object? sender, LogEntry e)
@@ -271,6 +557,45 @@ namespace ScanOutTool.ViewModels
             });
         }
 
+        private void StartQueueConsumer()
+        {
+            if (_queueConsumerTask != null && !_queueConsumerTask.IsCompleted)
+            {
+                return;
+            }
+
+            _queueCts = new CancellationTokenSource();
+            _queueConsumerTask = Task.Run(() => ProcessScanQueueAsync(_queueCts.Token));
+            _loggingService.LogInformation("[Queue] Khởi tạo luồng xử lý hàng chờ quét mã (Scan Queue Consumer).");
+        }
+
+        private async Task ProcessScanQueueAsync(CancellationToken cancellationToken)
+        {
+            var reader = _scanQueue.Reader;
+            try
+            {
+                while (await reader.WaitToReadAsync(cancellationToken))
+                {
+                    while (reader.TryRead(out string? rawData))
+                    {
+                        if (cancellationToken.IsCancellationRequested) return;
+                        if (string.IsNullOrWhiteSpace(rawData)) continue;
+
+                        _loggingService.LogInformation($"[Queue] Đang lấy mã từ hàng chờ ra xử lý: {rawData}");
+                        await HandleScannerDataReceivedAsync(rawData);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _loggingService.LogInformation("[Queue] Dừng luồng hàng chờ.");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[Queue] Lỗi trong luồng xử lý hàng chờ: {ex.Message}");
+            }
+        }
+
         private async Task StartSerialProxyAsync()
         {
             SerialPortSettingViewModel comDevice = _configService.Config.ScannerPortSettingVM; // SerialPortSettingViewModel comDevice
@@ -281,14 +606,21 @@ namespace ScanOutTool.ViewModels
                 return;
             }
 
+            StartQueueConsumer();
+
             _serialProxyManager = new SerialProxyManager
             {
                 Logger = new SerilogProxyLogger(_loggingService)
             };
 
-            _serialProxyManager.OnScannerDataReceived += async (s, e) =>
+            _serialProxyManager.OnScannerDataReceived += (s, e) =>
             {
-                await HandleScannerDataReceivedAsync(e.Data);
+                if (!string.IsNullOrWhiteSpace(e.Data))
+                {
+                    string rawData = e.Data.Trim();
+                    _loggingService.LogInformation($"[Queue] Nhận dữ liệu từ scanner, đưa vào hàng chờ: {rawData}");
+                    _scanQueue.Writer.TryWrite(rawData);
+                }
             };
 
             _serialProxyManager.OnAppDataReceived += async (s, e) =>
@@ -296,64 +628,95 @@ namespace ScanOutTool.ViewModels
                 _loggingService.LogInformation($"[Event] App gửi: {e.Data}");
                 await _serialProxyManager.SendToScannerAsync(e.Data);
             };
-            //_loggingService.LogInformation($"Starting serial proxy: Device={comDevice.SelectedPort}, App={comApp.SelectedPort}, BaudRate={comDevice.SelectedBaudRate}, Parity={comDevice.SelectedParity}, DataBits={comDevice.SelectedDataBits}, StopBits={comDevice.SelectedStopBits}");
 
             // Bắt đầu proxy (COM3 là thiết bị, COM5 là app chính, sniff sẽ tự tạo là COM4)
             await _serialProxyManager.StartProxy(comDevice.SelectedPort, comApp.SelectedPort, comDevice.SelectedBaudRate, comDevice.SelectedParity, comDevice.SelectedDataBits, comDevice.SelectedStopBits);
-            //_loggingService.LogInformation("Serial proxy started successfully.");
         }
 
         private async Task HandleScannerDataReceivedAsync(string data)
         {
-            _audioNotificationService.PlayBeep();
-            mainSW.Restart();
-            IsMessageOn = false;
-            _loggingService.LogInformation($"[Event] Device gửi: {data}");
-
-            if (await TryHandleSpecialScannerDataAsync(data))
+            await _scanProcessingLock.WaitAsync();
+            try
             {
-                return;
-            }
+                string pid = data?.Trim() ?? string.Empty;
 
-            string pid = data.Trim();
-            PID = pid;
-
-            if (await IsBlockedByRfAsync(pid))
-            {
-                return;
-            }
-
-            HmesBlockAction hmesBlockAction = CheckHmesBlock(pid);
-            if (hmesBlockAction == HmesBlockAction.StopBeforeShopFloor)
-            {
-                return;
-            }
-
-            if (hmesBlockAction == HmesBlockAction.SkipWebAfterShopFloor)
-            {
-                if (IsRescanOnly)
+                if (IsManualMagazineInputFocused)
                 {
-                    _loggingService.LogWarning($"Bỏ qua gửi web/rescan cho PID {pid} do HMES block trong Rescan only mode.");
+                    await Application.Current.Dispatcher.InvokeAsync(() => InputMagazineNo = pid);
+                    _loggingService.LogInformation($"[Scanner] Đã nhận '{pid}' vào ô Magazine No thủ công.");
                     return;
                 }
 
-                MarkSkipWebSendAfterShopFloor(pid);
-            }
+                if (await TryHandleSpecialScannerDataAsync(data))
+                {
+                    return;
+                }
 
-            if (IsRescanOnly)
+                // Kiểm tra và loại bỏ dữ liệu scan trùng lặp từ scanner gửi tới liên tiếp trong khoảng thời gian ngắn
+                TimeSpan timeSinceLastScan = DateTime.Now - _lastScannedTime;
+                if (!string.IsNullOrEmpty(pid) &&
+                    string.Equals(pid, _lastScannedPid, StringComparison.OrdinalIgnoreCase) &&
+                    timeSinceLastScan.TotalMilliseconds < DuplicateScanThresholdMs)
+                {
+                    _loggingService.LogWarning($"[Scanner] Trùng PID '{pid}' phát hiện trong {timeSinceLastScan.TotalMilliseconds:0}ms (Scanner scan 2 lần liên tiếp). Bỏ qua lượt quét trùng này.");
+                    return;
+                }
+
+                _lastScannedPid = pid;
+                _lastScannedTime = DateTime.Now;
+
+                _audioNotificationService.PlayBeep();
+                mainSW.Restart();
+                IsMessageOn = false;
+                _loggingService.LogInformation($"[Event] Device gửi: {data}");
+
+                PID = pid;
+
+                if (await IsBlockedByRfAsync(pid))
+                {
+                    return;
+                }
+
+                HmesBlockAction hmesBlockAction = CheckHmesBlock(pid);
+                if (hmesBlockAction == HmesBlockAction.StopBeforeShopFloor)
+                {
+                    return;
+                }
+
+                if (hmesBlockAction == HmesBlockAction.SkipWebAfterShopFloor)
+                {
+                    if (IsRescanOnly)
+                    {
+                        _loggingService.LogWarning($"Bỏ qua gửi web/rescan cho PID {pid} do HMES block trong Rescan only mode.");
+                        return;
+                    }
+
+                    MarkSkipWebSendAfterShopFloor(pid);
+                }
+
+                if (IsRescanOnly)
+                {
+                    _loggingService.LogInformation($"[Event] {pid} - Rescan only mode, sending directly to web.");
+                    await SendRescanOnlyAsync(pid);
+                    return;
+                }
+
+                if (!ClearShopFloorBeforeNextPidIfNeeded(pid))
+                {
+                    return;
+                }
+
+                await _serialProxyManager.SendToAppAsync(data);
+                await ProcessShopFloorResultAfterForwardAsync(data);
+            }
+            catch (Exception ex)
             {
-                _loggingService.LogInformation($"[Event] {pid} - Rescan only mode, sending directly to web.");
-                await SendRescanOnlyAsync(pid);
-                return;
+                _loggingService.LogError($"Lỗi khi xử lý dữ liệu scanner: {ex.Message}");
             }
-
-            if (!ClearShopFloorBeforeNextPidIfNeeded(pid))
+            finally
             {
-                return;
+                _scanProcessingLock.Release();
             }
-
-            await _serialProxyManager.SendToAppAsync(data);
-            await ProcessShopFloorResultAfterForwardAsync(data);
         }
 
         private async Task<bool> TryHandleSpecialScannerDataAsync(string data)
@@ -404,14 +767,6 @@ namespace ScanOutTool.ViewModels
                 _shouldClearShopFloorBeforeNextPid = false;
             }
 
-            if (!scannerCommand.Equals("CLEAR", StringComparison.OrdinalIgnoreCase)
-                && scannerCommand.Length != 11
-                && scannerCommand.Length != 22)
-            {
-                _loggingService.LogInformation($"[Event] {scannerCommand} - Data length: {scannerCommand.Length}");
-                return true;
-            }
-
             _loggingService.LogInformation($"Check logic done {mainSW.ElapsedMilliseconds}");
 
             return false;
@@ -426,7 +781,7 @@ namespace ScanOutTool.ViewModels
                 return false;
             }
 
-            ShowWarningMessage($"PID {pid} đã bị chặn do NG RF ở jig {rFInfo.MachineIP} band {rFInfo.Band} sinal{rFInfo.Signpath}");
+            ShowWarningMessage($"PID {pid} đã bị chặn do NG RF ở jig {rFInfo.MachineIP} band {rFInfo.Band} sinal{rFInfo.Signpath} antenal number {rFInfo.AntNumber} value {rFInfo.ValueNg}");
             _loggingService.LogWarning($"PID {pid} bị RF block");
             return true;
         }
@@ -573,8 +928,11 @@ namespace ScanOutTool.ViewModels
         private void ShowWarningMessage(string message)
         {
             _audioNotificationService.PlayNg();
-            InformationMessage = message;
-            IsMessageOn = true;
+            Application.Current?.Dispatcher.Invoke(() =>
+            {
+                InformationMessage = message;
+                IsMessageOn = true;
+            });
         }
 
         private void StopSerialProxy()
@@ -674,7 +1032,7 @@ namespace ScanOutTool.ViewModels
 
                 _loggingService.LogInformation($"Sending data to database: WorkOrder={WorkOrder}, ModelSuffix={PartNo}, WipSerialNumber={PID}");
                 ProcessResult result = new ProcessResult();
-                if(IsScanOutOnly)
+                if(IsScanOutOnly || IsSkipHmesWeb)
                 {
                     result =  await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID, validateDatabase: true, transferToWeb: false);                    
                 }
@@ -731,7 +1089,7 @@ namespace ScanOutTool.ViewModels
                     finalResult = true;
                 }
 
-                if (!IsScanOutOnly)
+                if (!IsScanOutOnly && !IsSkipHmesWeb)
                 {
                     await RefreshHmesInfoAsync();
                 }
@@ -808,6 +1166,7 @@ namespace ScanOutTool.ViewModels
         {            
             ProcessResult result = new ProcessResult();
             if (string.IsNullOrEmpty(WorkOrder)) return result;
+            bool transferToWeb = !IsSkipHmesWeb && !IsScanOutOnly;
             if (string.IsNullOrEmpty(SelectedEBR))
             {
                 ShowErrorDialog("Vui lòng chọn Part No trước khi scan");
@@ -822,7 +1181,7 @@ namespace ScanOutTool.ViewModels
                 }
                 else
                 {
-                    result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID);
+                    result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID, validateDatabase: true, transferToWeb: transferToWeb);
                 }
             }
             return result;
@@ -832,32 +1191,36 @@ namespace ScanOutTool.ViewModels
         {
             ProcessResult result = new ProcessResult();
             if(string.IsNullOrEmpty(PartNo)) return result;
+            bool transferToWeb = !IsSkipHmesWeb && !IsScanOutOnly;
             if (PartNo != SelectedEBR && !string.IsNullOrEmpty(SelectedEBR))
             {
                 _loggingService.LogInformation($"PartNo miss match: {PartNo} != {SelectedEBR}");
-                int PackQty = await _scanDataService.GetPackQty();
+                int PackQty = IsSkipHmesWeb ? 0 : await _scanDataService.GetPackQty();
                 if (PackQty == 0)
                 {                    
                     result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID, validateDatabase: true, transferToWeb: false);
                 }
                 else
                 {
-                    result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID);
+                    result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID, validateDatabase: true, transferToWeb: transferToWeb);
                 }
             }
             else
             {
-                result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID);
+                result = await _scanDataService.ProcessDataAsync(WorkOrder, PartNo, PID, validateDatabase: true, transferToWeb: transferToWeb);
             }
 
-            int currentPCBQty = await _scanDataService.GetPackQty();
-            int totalPCBQty = await _scanDataService.GetMagazineQty();
-
-            if(MagazineQty !=0 && MagazineQty != totalPCBQty && currentPCBQty == MagazineQty)
+            if (!IsSkipHmesWeb)
             {
-                if(MagazineQty>totalPCBQty && currentPCBQty >= (totalPCBQty-1)) 
-                    ShowErrorDialog("Số lượng PCB trên hệ thống HMES đang nhỏ hơn số lượng cài đặt");
-                await _scanDataService.PrintManual();
+                int currentPCBQty = await _scanDataService.GetPackQty();
+                int totalPCBQty = await _scanDataService.GetMagazineQty();
+
+                if(MagazineQty !=0 && MagazineQty != totalPCBQty && currentPCBQty == MagazineQty)
+                {
+                    if(MagazineQty>totalPCBQty && currentPCBQty >= (totalPCBQty-1)) 
+                        ShowErrorDialog("Số lượng PCB trên hệ thống HMES đang nhỏ hơn số lượng cài đặt");
+                    await _scanDataService.PrintManual();
+                }
             }
 
             return result;
@@ -938,6 +1301,18 @@ namespace ScanOutTool.ViewModels
                 HmesPackQty = info.PackQty;
                 HmesMagazineQty = info.MagazineQty;
                 HmesMagazineNo = info.MagazineNo;
+
+                if (!string.IsNullOrEmpty(info.TransactionType))
+                {
+                    if (info.TransactionType == "NORMAL" && !IsTransactionTypeNormal)
+                    {
+                        IsTransactionTypeNormal = true;
+                    }
+                    else if (info.TransactionType == "CANCEL" && !IsTransactionTypeCancel)
+                    {
+                        IsTransactionTypeCancel = true;
+                    }
+                }
             }
             catch (Exception ex)
             {

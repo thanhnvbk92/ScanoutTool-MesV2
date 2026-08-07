@@ -1,4 +1,4 @@
-﻿using ScanOutTool.Models;
+using ScanOutTool.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -38,18 +38,48 @@ namespace ScanOutTool.Services
 
             if (!string.IsNullOrEmpty(jsonString))
             {
-                _rFInfos = JsonSerializer.Deserialize<List<RFInfo>>(jsonString, options);
+                try
+                {
+                    _rFInfos = JsonSerializer.Deserialize<List<RFInfo>>(jsonString, options) ?? new List<RFInfo>();
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError($"Lỗi khi giải mã JSON RFInfo: {ex.Message}");
+                    _rFInfos = new List<RFInfo>();
+                }
             }
             
-            if(_rFInfos.Count==0)
+            var activeBlocks = _rFInfos.Where(x => !x.Cleared).ToList();
+
+            if (activeBlocks.Count == 0)
             {        
                 _loggingService.LogInformation($"No blocked RF information found for PID {pid}.");
                 return null;
-            }
+            }         
             else
             {
-                _loggingService.LogInformation($"Found {_rFInfos.Count} blocked RF information(s) for PID {pid} Band{_rFInfos[0].Band} Machine {_rFInfos[0].MachineIP}.");
-                return _rFInfos[0];
+                var blockingItem = activeBlocks.FirstOrDefault(x =>
+                {
+                    string ant = (x.AntNumber ?? "").Trim().ToUpper();
+                    bool isExemptAntenna = (ant != "A1" && ant != "B5");
+                    bool isExemptValue = Math.Abs(x.ValueNg) > 500;
+
+                    if (isExemptValue)
+                    {
+                        _loggingService.LogInformation($"RF block for PID {pid} (Ant: {x.AntNumber}, Value: {x.ValueNg}) is exempt because Value > 500.");
+                        return false;
+                    }
+                    return true;
+                });
+
+                if (blockingItem == null)
+                {
+                    _loggingService.LogInformation($"All active RF blocks for PID {pid} are exempt => No block.");
+                    return null;
+                }
+
+                _loggingService.LogInformation($"Found blocking RF information for PID {pid}: Band {blockingItem.Band}, Machine {blockingItem.MachineIP}, AntNumber {blockingItem.AntNumber}, Value {blockingItem.ValueNg}.");
+                return blockingItem;
             }    
         }
 

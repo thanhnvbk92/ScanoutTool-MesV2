@@ -1,4 +1,4 @@
-<Page x:Class="ScanOutTool.Views.SettingsPage"
+﻿<Page x:Class="ScanOutTool.Views.SettingsPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:controls="clr-namespace:ScanOutTool.Views.Controls"
@@ -35,7 +35,9 @@
         </Style>
     </Page.Resources>
 
-    <Grid Margin="12" IsEnabled="{Binding CanEdit}">
+    <Grid>
+        <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+            <Grid Width="960" Height="520" Margin="12" IsEnabled="{Binding CanEdit}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -93,19 +95,27 @@
 
                         <Grid Grid.Row="1">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220"/>
-                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="160"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBox Text="{Binding ServerIP}"
                                      Style="{StaticResource MaterialDesignFloatingHintTextBox}"
                                      materialDesign:HintAssist.Hint="Server IP"
                                      Foreground="{DynamicResource MaterialDesignBody}"
-                                     Margin="0,0,18,0"/>
+                                     Margin="0,0,12,0"/>
 
                             <CheckBox Grid.Column="1"
                                       Content="Work Order Mode"
                                       IsChecked="{Binding IsWOMode}"
+                                      VerticalAlignment="Center"
+                                      Foreground="{DynamicResource MaterialDesignBody}"
+                                      Margin="0,0,12,0"/>
+
+                            <CheckBox Grid.Column="2"
+                                      Content="Skip HMES Web"
+                                      IsChecked="{Binding SkipHmesWeb}"
                                       VerticalAlignment="Center"
                                       Foreground="{DynamicResource MaterialDesignBody}"/>
                         </Grid>
@@ -199,5 +209,7 @@
                 </Border>
             </Grid>
         </Grid>
+            </Grid>
+        </Viewbox>
     </Grid>
 </Page>

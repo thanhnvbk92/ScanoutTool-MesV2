@@ -32,6 +32,22 @@ namespace ScanOutTool.Views
             LogTextBox.ScrollToEnd();
         }
 
+        private void ManualMagazineNoTextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (DataContext is DashboardViewModel viewModel)
+            {
+                viewModel.IsManualMagazineInputFocused = true;
+            }
+        }
+
+        private void ManualMagazineNoTextBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (DataContext is DashboardViewModel viewModel)
+            {
+                viewModel.IsManualMagazineInputFocused = false;
+            }
+        }
+
         //private void LogTextBlock_TargetUpdated(object sender, DataTransferEventArgs e)
         //{
         //    LogScrollViewer.ScrollToEnd();

@@ -15,5 +15,8 @@ namespace ScanOutTool.Services
         Task<int> GetMagazineQty();
         Task<RescanInfo> GetLastRescanInfo();
         Task<bool> PrintManual();
+        Task<bool> SaveLabelAsync();
+        Task<bool> SearchMagazineNoAsync(string magazineNo);
+        Task<bool> SetTransactionTypeAsync(string transactionType);
     }
 }

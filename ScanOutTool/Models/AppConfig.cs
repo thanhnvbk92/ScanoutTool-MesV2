@@ -10,5 +10,6 @@ namespace ScanOutTool.Models
         public string ServerIP { get; set; }
         public string ShopFloorExePath { get; set; }
         public string ShopFloorLogPath { get; set; } = "C:\\Admin\\Documents\\LG CNS\\ezMES\\Logs";
+        public bool SkipHmesWeb { get; set; }
     }
 }

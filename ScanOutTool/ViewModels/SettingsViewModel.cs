@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using ScanOutTool.Models;
@@ -18,6 +18,8 @@ namespace ScanOutTool.ViewModels
 
         [ObservableProperty] private bool isWOMode;
 
+        [ObservableProperty] private bool skipHmesWeb;
+
         [ObservableProperty] private string serverIP;
 
         [ObservableProperty] private string shopFloorExePath;
@@ -33,6 +35,7 @@ namespace ScanOutTool.ViewModels
             _configService.Config.ShopFloorPortSettingVM = ShopFloorPortSettingVM;
             _configService.Config.ServerIP = ServerIP;
             _configService.Config.IsWOMode = IsWOMode;
+            _configService.Config.SkipHmesWeb = SkipHmesWeb;
             _configService.Config.ShopFloorExePath = ShopFloorExePath;
             _configService.Config.ShopFloorLogPath = ShopFloorLogPath;
             _configService.Save();
@@ -77,6 +80,7 @@ namespace ScanOutTool.ViewModels
             ScannerPortSettingVM = _configService.Config.ScannerPortSettingVM?? new SerialPortSettingViewModel();
             ShopFloorPortSettingVM = _configService.Config.ShopFloorPortSettingVM?? new SerialPortSettingViewModel();
             IsWOMode = _configService.Config.IsWOMode;
+            SkipHmesWeb = _configService.Config.SkipHmesWeb;
             ServerIP = _configService.Config.ServerIP;
             ShopFloorExePath = _configService.Config.ShopFloorExePath;
             ShopFloorLogPath = _configService.Config.ShopFloorLogPath ?? "C:\\Admin\\Documents\\LG CNS\\ezMES\\Logs";

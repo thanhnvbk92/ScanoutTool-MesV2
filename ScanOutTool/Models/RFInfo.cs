@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -18,7 +18,7 @@ namespace ScanOutTool.Models
 
         [JsonPropertyName("valuE_NG")]
         public string ValueNgRaw { get; set; }
-        public double ValueNg => double.Parse(ValueNgRaw);
+        public double ValueNg => double.TryParse(ValueNgRaw, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var val) ? val : 0;
 
         public string Freq { get; set; }
         public string Band { get; set; }
@@ -48,7 +48,7 @@ namespace ScanOutTool.Models
 
         [JsonPropertyName("creatE_USER")]
         public string CreateUser { get; set; }
-        public string MachineIP => CreateUser.Split("-")[0];
+        public string MachineIP => string.IsNullOrEmpty(CreateUser) ? "" : CreateUser.Split("-")[0];
 
         [JsonPropertyName("creatE_TIME")]
         [JsonConverter(typeof(CustomDateTimeConverter))]
@@ -62,24 +62,39 @@ namespace ScanOutTool.Models
 
     public class CustomDateTimeConverter : JsonConverter<DateTime>
     {
-        private const string DateFormat = "dd-MM-yyyy HH:mm:ss";
+        private static readonly string[] Formats = new[]
+        {
+            "yyyy-MM-dd HH:mm:ss",
+            "dd-MM-yyyy HH:mm:ss",
+            "yyyy/MM/dd HH:mm:ss",
+            "dd/MM/yyyy HH:mm:ss",
+            "yyyy-MM-ddTHH:mm:ss",
+            "yyyy-MM-dd HH:mm:ss.fff"
+        };
 
         public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             string? dateStr = reader.GetString();
+            if (string.IsNullOrWhiteSpace(dateStr)) return DateTime.MinValue;
 
-            if (DateTime.TryParseExact(dateStr, DateFormat, System.Globalization.CultureInfo.InvariantCulture,
+            if (DateTime.TryParseExact(dateStr, Formats, System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out var dt))
             {
                 return dt;
             }
 
-            throw new JsonException($"Unable to parse DateTime: {dateStr}");
+            if (DateTime.TryParse(dateStr, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out dt))
+            {
+                return dt;
+            }
+
+            return DateTime.MinValue;
         }
 
         public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
         {
-            writer.WriteStringValue(value.ToString(DateFormat));
+            writer.WriteStringValue(value.ToString("yyyy-MM-dd HH:mm:ss"));
         }
     }
 
@@ -91,17 +106,22 @@ namespace ScanOutTool.Models
             if (reader.TokenType == JsonTokenType.String)
             {
                 string? value = reader.GetString();
-                return value == "1";
+                return value == "1" || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
             }
             else if (reader.TokenType == JsonTokenType.Number)
             {
                 int intValue = reader.GetInt32();
                 return intValue == 1;
             }
-            else
+            else if (reader.TokenType == JsonTokenType.True)
             {
-                throw new JsonException($"Unexpected token type {reader.TokenType} for bool conversion.");
+                return true;
             }
+            else if (reader.TokenType == JsonTokenType.False)
+            {
+                return false;
+            }
+            return false;
         }
 
         public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options)

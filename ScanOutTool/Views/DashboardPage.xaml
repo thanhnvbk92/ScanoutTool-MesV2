@@ -41,19 +41,19 @@
 
         <Style x:Key="ShopFloorInfoValueStyle" TargetType="TextBlock" BasedOn="{StaticResource ValueStyle}">
             <Setter Property="FontSize" Value="18"/>
-            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
         <Style x:Key="ShopFloorPrimaryInfoValueStyle" TargetType="TextBlock" BasedOn="{StaticResource ValueStyle}">
-            <Setter Property="FontSize" Value="30"/>
-            <Setter Property="FontWeight" Value="Black"/>
-            <Setter Property="MinHeight" Value="36"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
 
         <Style x:Key="LargeResultStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
-            <Setter Property="FontSize" Value="120"/>
+            <Setter Property="FontSize" Value="68"/>
             <Setter Property="FontWeight" Value="Black"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -71,6 +71,8 @@
 
         <Style x:Key="HmesResultStyle" TargetType="TextBlock" BasedOn="{StaticResource ValueStyle}">
             <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HmesResult}" Value="OK">
                     <Setter Property="Foreground" Value="#39D353"/>
@@ -82,15 +84,21 @@
         </Style>
 
         <Style x:Key="ReadOnlyBoxStyle" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignOutlinedTextBox}">
+            <Setter Property="materialDesign:HintAssist.IsFloating" Value="True"/>
+            <Setter Property="materialDesign:HintAssist.Background" Value="{Binding Background, RelativeSource={RelativeSource Self}}"/>
+            <Setter Property="materialDesign:HintAssist.HintPaddingBrush" Value="{Binding Background, RelativeSource={RelativeSource Self}}"/>
+            <Setter Property="Background" Value="{DynamicResource MaterialDesignPaper}"/>
             <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
             <Setter Property="IsReadOnly" Value="True"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="VerticalContentAlignment" Value="Top"/>
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="Padding" Value="10"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
         </Style>
 
         <Style x:Key="ShopFloorMessageBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ReadOnlyBoxStyle}">
+            <Setter Property="Background" Value="{DynamicResource MaterialDesignBackground}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Result}" Value="OK">
                     <Setter Property="Foreground" Value="#39D353"/>
@@ -102,6 +110,7 @@
         </Style>
 
         <Style x:Key="HmesMessageBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ReadOnlyBoxStyle}">
+            <Setter Property="Background" Value="{DynamicResource MaterialDesignBackground}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HmesResult}" Value="OK">
                     <Setter Property="Foreground" Value="#39D353"/>
@@ -111,316 +120,464 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <Style x:Key="HmesWebPanelStyle" TargetType="Border" BasedOn="{StaticResource SurfaceStyle}">
+            <Setter Property="Visibility" Value="Visible"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSkipHmesWeb}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LeftColumnGridStyle" TargetType="Grid">
+            <Setter Property="Grid.ColumnSpan" Value="1"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSkipHmesWeb}" Value="True">
+                    <Setter Property="Grid.ColumnSpan" Value="2"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </Page.Resources>
 
-    <Grid Margin="8">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="200"/>
-        </Grid.RowDefinitions>
+    <Grid>
+        <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+            <Grid Width="1200" Height="640" Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Style="{StaticResource SurfaceStyle}" Padding="5">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <TextBox Grid.Column="0"
-                         Text="{Binding SelectedEBR}"
-                         Width="180"
-                         Foreground="{DynamicResource MaterialDesignBody}"
-                         Style="{StaticResource MaterialDesignFloatingHintTextBox}"
-                         materialDesign:HintAssist.Hint="Selected EBR/WO"
-                         Margin="0,0,10,0"/>
-
-                <ComboBox Grid.Column="1"
-                          SelectedItem="{Binding SelectedRunMode}"
-                          ItemsSource="{Binding RunModes}"
-                          Width="165"
-                          Foreground="{DynamicResource MaterialDesignBody}"
-                          Style="{StaticResource MaterialDesignFloatingHintComboBox}"
-                          materialDesign:HintAssist.Hint="Run Mode"/>
-
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">                    
-                    <Button Content="{Binding StartBtnText}"
-                            Command="{Binding StartCommand}"
-                            MinWidth="120"
-                            Height="42"
-                            FontWeight="SemiBold"
-                            IsEnabled="{Binding IsSessionStarting, Converter={StaticResource InverseBoolConverter}}"/>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.18*"/>
-                <ColumnDefinition Width="0.82*"/>
-            </Grid.ColumnDefinitions>          
-
-            <Border Grid.Column="0" Style="{StaticResource SurfaceStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="80"/>
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0">
+                <!-- Top Bar -->
+                <Border Grid.Row="0" Style="{StaticResource SurfaceStyle}" Padding="5">
+                    <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="MonitorDashboard" Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock Text="ShopFloor Data" Style="{StaticResource SectionTitleStyle}"/>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <Button Command="{Binding ShopFloorClearCommand}"
-                                    Height="36"
-                                    MinWidth="92"
-                                    Padding="12,0"
-                                    Margin="0,0,8,0"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Broom" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="CLEAR"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Command="{Binding ShopFloorTraceCommand}"
-                                    Height="36"
-                                    MinWidth="92"
-                                    Padding="12,0"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="History" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="TRACE"/>
-                                </StackPanel>
-                            </Button>
+
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding SelectedEBR}"
+                                 Width="200"
+                                 Foreground="{DynamicResource MaterialDesignBody}"
+                                 materialDesign:HintAssist.Hint="Selected EBR/WO"
+                                 materialDesign:HintAssist.IsFloating="True"
+                                 Height="38"
+                                 Padding="10,4"
+                                 Margin="0,0,14,0"/>
+
+                        <ComboBox Grid.Column="1"
+                                  SelectedItem="{Binding SelectedRunMode}"
+                                  ItemsSource="{Binding RunModes}"
+                                  Width="180"
+                                  Foreground="{DynamicResource MaterialDesignBody}"
+                                  Style="{StaticResource MaterialDesignFloatingHintComboBox}"
+                                  materialDesign:HintAssist.Hint="Run Mode"/>
+
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="{Binding StartBtnText}"
+                                    Command="{Binding StartCommand}"
+                                    MinWidth="120"
+                                    Height="42"
+                                    FontWeight="SemiBold"
+                                    IsEnabled="{Binding IsSessionStarting, Converter={StaticResource InverseBoolConverter}}"/>
                         </StackPanel>
                     </Grid>
+                </Border>
 
-                    <UniformGrid Grid.Row="1" Columns="3" Rows="1" Margin="0,14,0,8">
-                        <StackPanel Margin="0,0,14,0">
-                            <TextBlock Text="PID" Style="{StaticResource CaptionStyle}"/>
-                            <Viewbox Stretch="Uniform"
-                                     StretchDirection="Both"
-                                     HorizontalAlignment="Left"
-                                     MaxHeight="30">
-                                <TextBlock Text="{Binding PID}" Style="{StaticResource ShopFloorInfoValueStyle}"/>
-                            </Viewbox>
-                        </StackPanel>
+                <!-- Main Content Grid -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                    </Grid.ColumnDefinitions>
 
-                        <StackPanel Margin="0,0,14,0">
-                            <TextBlock Text="Part No" Style="{StaticResource CaptionStyle}"/>
-                            <Viewbox Stretch="Uniform"
-                                     StretchDirection="Both"
-                                     HorizontalAlignment="Left"
-                                     MaxHeight="40">
-                                <TextBlock Text="{Binding PartNo}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
-                            </Viewbox>
-                        </StackPanel>
-
-                        <StackPanel>
-                            <TextBlock Text="Work Order" Style="{StaticResource CaptionStyle}"/>
-                            <Viewbox Stretch="Uniform"
-                                     StretchDirection="Both"
-                                     HorizontalAlignment="Left"
-                                     MaxHeight="40">
-                                <TextBlock Text="{Binding WorkOrder}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
-                            </Viewbox>
-                        </StackPanel>
-                    </UniformGrid>
-                    <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Viewbox Stretch="Uniform"
-                                 StretchDirection="Both"
-                                 HorizontalAlignment="Center"
-                                 MaxHeight="200">
-                            <TextBlock Text="{Binding Result}" Style="{StaticResource LargeResultStyle}"/>
-                        </Viewbox>
-                        <StackPanel HorizontalAlignment="Center" Margin="0,-8,0,4">                           
-                            <Viewbox Stretch="Uniform"
-                                     StretchDirection="Both"
-                                     MaxHeight="40"
-                                     HorizontalAlignment="Center">
-                                <TextBlock Text="{Binding Progress}"
-                                           Foreground="{DynamicResource MaterialDesignBody}"
-                                           FontSize="34"
-                                           FontWeight="Bold"
-                                           HorizontalAlignment="Center"
-                                           TextAlignment="Center"
-                                           TextWrapping="NoWrap"/>
-                            </Viewbox>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <TextBox Grid.Row="3"
-                             Text="{Binding ResultMessage}"
-                             materialDesign:HintAssist.Hint="ShopFloor Message"
-                             Style="{StaticResource ShopFloorMessageBoxStyle}"
-                             Height="72"/>
-                </Grid>
-            </Border>
-
-            <Border Grid.Column="1" Style="{StaticResource SurfaceStyle}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="80"/>
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Web" Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock Text="HMES Web Data" Style="{StaticResource SectionTitleStyle}"/>
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Command="{Binding ManualPrintCommand}"
-                                Height="36"
-                                MinWidth="126"
-                                Padding="12,0">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Printer" Width="17" Height="17" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <TextBlock Text="Manual Print"/>
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-
-                    <Grid Grid.Row="1" Margin="0,16,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1.2*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Margin="0,0,18,0">
-                            <TextBlock Text="Result" Style="{StaticResource CaptionStyle}"/>
-                            <Viewbox Stretch="Uniform"
-                                     StretchDirection="Both"
-                                     HorizontalAlignment="Left"     
-                                     VerticalAlignment="Stretch"
-                                     MaxHeight="80">
-                                <TextBlock Text="{Binding HmesResult}" Style="{StaticResource HmesResultStyle}"/>
-                            </Viewbox>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="Sending" Style="{StaticResource CaptionStyle}"/>
-                            <TextBlock Text="{Binding IsDataSending}" Style="{StaticResource CompactValueStyle}"/>
-                            <TextBlock Text="Run Mode" Style="{StaticResource CaptionStyle}" Margin="0,14,0,0"/>
-                            <TextBlock Text="{Binding SelectedRunMode}" Style="{StaticResource CompactValueStyle}"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid Grid.Row="2">
+                    <!-- Left Column: ShopFloor Data + Logs -->
+                    <Grid Grid.Column="0" Style="{StaticResource LeftColumnGridStyle}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Grid Grid.Row="0" Margin="0,0,0,14">
+
+                        <!-- ShopFloor Data Card -->
+                        <Border Grid.Row="0" Style="{StaticResource SurfaceStyle}" IsEnabled="{Binding IsStarted}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="MonitorDashboard" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Text="ShopFloor Data" Style="{StaticResource SectionTitleStyle}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Command="{Binding ShopFloorClearCommand}"
+                                                Height="32" MinWidth="80" Padding="8,0" Margin="0,0,6,0"
+                                                Style="{StaticResource MaterialDesignOutlinedButton}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="Broom" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                <TextBlock Text="CLEAR" FontSize="11"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Command="{Binding ShopFloorTraceCommand}"
+                                                Height="32" MinWidth="80" Padding="8,0"
+                                                Style="{StaticResource MaterialDesignOutlinedButton}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="History" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                <TextBlock Text="TRACE" FontSize="11"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <UniformGrid Grid.Row="1" Columns="3" Rows="1" Margin="0,6,0,4">
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="PID" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="{Binding PID}" Style="{StaticResource ShopFloorInfoValueStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Margin="0,0,8,0">
+                                        <TextBlock Text="Part No" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="{Binding PartNo}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel>
+                                        <TextBlock Text="Work Order" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="{Binding WorkOrder}" Style="{StaticResource ShopFloorPrimaryInfoValueStyle}"/>
+                                    </StackPanel>
+                                </UniformGrid>
+
+                                <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,2,0,2">
+                                    <TextBlock Text="{Binding Result}" Style="{StaticResource LargeResultStyle}"/>
+                                    <TextBlock Text="{Binding Progress}"
+                                               Foreground="{DynamicResource MaterialDesignBody}"
+                                               FontSize="20" FontWeight="Bold"
+                                               HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="NoWrap"
+                                               Margin="0,2,0,0"/>
+                                </StackPanel>
+
+                                <TextBox Grid.Row="3"
+                                         Text="{Binding ResultMessage}"
+                                         materialDesign:HintAssist.Hint="ShopFloor Message"
+                                         Style="{StaticResource ShopFloorMessageBoxStyle}"
+                                         Height="50" Margin="0,4,0,0"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Logs Card (Bottom Left) -->
+                        <Border Grid.Row="1" Style="{StaticResource SurfaceStyle}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0" Margin="0,0,0,4">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FormatListBulleted" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Logs" Style="{StaticResource SectionTitleStyle}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBox x:Name="LogTextBox"
+                                         Grid.Row="1"
+                                         Text="{Binding Logs}"
+                                         TextWrapping="NoWrap"
+                                         Foreground="{DynamicResource MaterialDesignBody}"
+                                         FontFamily="Consolas"
+                                         FontSize="11"
+                                         IsReadOnly="True"
+                                         BorderThickness="0"
+                                         MinHeight="30"
+                                         VerticalScrollBarVisibility="Auto"
+                                         HorizontalScrollBarVisibility="Visible"
+                                         TextChanged="LogTextBox_TextChanged"
+                                         VerticalContentAlignment="Top"
+                                         HorizontalAlignment="Stretch"
+                                         VerticalAlignment="Stretch"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Right Column: HMES Web Data (Spans Full Height) -->
+                    <Border Grid.Column="1" Style="{StaticResource HmesWebPanelStyle}" IsEnabled="{Binding IsStarted}">
+                        <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/> <!-- Header & Action Buttons -->
+                                <RowDefinition Height="Auto"/> <!-- Status & Transaction Type Card -->
+                                <RowDefinition Height="Auto"/> <!-- Metrics (Pack Qty, QPM, Mag No) -->
+                                <RowDefinition Height="Auto"/> <!-- Search & Message Input -->
+                                <RowDefinition Height="*"/>    <!-- Saved Magazines Table -->
                             </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Pack Qty" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="0"
-                                       Text="{Binding HmesPackQty}"
-                                       Style="{StaticResource ValueStyle}"
-                                       HorizontalAlignment="Left"
-                                       TextAlignment="Left"/>
+                            <!-- Header -->
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <materialDesign:PackIcon Kind="Web" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="HMES Web Data" Style="{StaticResource SectionTitleStyle}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <Button Command="{Binding SaveLabelCommand}"
+                                            Height="30" MinWidth="80" Padding="8,0" Margin="0,0,6,0"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="ContentSave" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <TextBlock Text="Lưu tem" FontSize="11"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Command="{Binding ManualPrintCommand}"
+                                            Height="30" MinWidth="95" Padding="8,0"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Printer" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <TextBlock Text="Manual Print" FontSize="11"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
 
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Magazine QPM" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="1"
-                                       Text="{Binding HmesMagazineQty}"
-                                       Style="{StaticResource ValueStyle}"
-                                       HorizontalAlignment="Left"
-                                       TextAlignment="Left"/>
+                            <!-- Status & Transaction Type Card -->
+                            <Border Grid.Row="1" Background="{DynamicResource MaterialDesignPaper}" CornerRadius="6" Padding="10,8" Margin="0,0,0,8" BorderThickness="1" BorderBrush="{DynamicResource MaterialDesignDivider}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.2*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="1.3*"/>
+                                    </Grid.ColumnDefinitions>
 
-                            <TextBlock Grid.Row="0" Grid.Column="2" Text="Magazine No" Style="{StaticResource CaptionStyle}" VerticalAlignment="Center" Margin="0,4,0,0"/>
-                            <TextBlock Grid.Row="1"
-                                       Grid.Column="2"
-                                       Text="{Binding HmesMagazineNo}"
-                                       Style="{StaticResource CompactValueStyle}"
-                                       HorizontalAlignment="Left"
-                                       TextAlignment="Left"/>
+                                    <!-- Result -->
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Result" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="{Binding HmesResult}" Style="{StaticResource HmesResultStyle}"/>
+                                    </StackPanel>
+
+                                    <!-- Sending Status -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="Sending" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="{Binding IsDataSending}" Style="{StaticResource CompactValueStyle}" Margin="0,2,0,0"/>
+                                    </StackPanel>
+
+                                    <!-- Transaction Type -->
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Trans Type" Style="{StaticResource CaptionStyle}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                            <RadioButton Content="NORML" IsChecked="{Binding IsTransactionTypeNormal}" Margin="0,0,8,0" GroupName="HmesTransTypeGroup" Foreground="{DynamicResource MaterialDesignBody}" FontSize="12"/>
+                                            <RadioButton Content="CANCEL" IsChecked="{Binding IsTransactionTypeCancel}" GroupName="HmesTransTypeGroup" Foreground="{DynamicResource MaterialDesignBody}" FontSize="12"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Metrics (Pack Qty, Magazine QPM, Magazine No) -->
+                            <UniformGrid Grid.Row="2" Columns="3" Rows="1" Margin="0,0,0,8">
+                                <Border Background="{DynamicResource MaterialDesignPaper}" CornerRadius="6" Padding="8,6" Margin="0,0,4,0" BorderThickness="1" BorderBrush="{DynamicResource MaterialDesignDivider}">
+                                    <StackPanel>
+                                        <TextBlock Text="Pack Qty" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="{Binding HmesPackQty}" Style="{StaticResource ValueStyle}" HorizontalAlignment="Left"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{DynamicResource MaterialDesignPaper}" CornerRadius="6" Padding="8,6" Margin="2,0,2,0" BorderThickness="1" BorderBrush="{DynamicResource MaterialDesignDivider}">
+                                    <StackPanel>
+                                        <TextBlock Text="Magazine QPM" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="{Binding HmesMagazineQty}" Style="{StaticResource ValueStyle}" HorizontalAlignment="Left"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="{DynamicResource MaterialDesignPaper}" CornerRadius="6" Padding="8,6" Margin="4,0,0,0" BorderThickness="1" BorderBrush="{DynamicResource MaterialDesignDivider}">
+                                    <StackPanel>
+                                        <TextBlock Text="Magazine No" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBox Text="{Binding HmesMagazineNo, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource MaterialDesignBody}" FontSize="14" FontWeight="Bold" Padding="0" Margin="0,2,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </UniformGrid>
+
+                            <!-- Message & Search Input -->
+                            <StackPanel Grid.Row="3" Margin="0,0,0,8">
+                                <!-- HMES Message Box -->
+                                <TextBox Text="{Binding HmesMessage}"
+                                         materialDesign:HintAssist.Hint="HMES Message"
+                                         Style="{StaticResource HmesMessageBoxStyle}"
+                                         Height="45" Margin="0,0,0,8"/>
+
+                                <!-- Manual Magazine Search Input -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="ManualMagazineNoTextBox"
+                                             Grid.Column="0"
+                                             Text="{Binding InputMagazineNo, UpdateSourceTrigger=PropertyChanged}"
+                                             materialDesign:HintAssist.Hint="Nhập Magazine No"
+                                             materialDesign:HintAssist.IsFloating="True"
+                                             materialDesign:HintAssist.Background="{Binding Background, RelativeSource={RelativeSource Self}}"
+                                             materialDesign:HintAssist.HintPaddingBrush="{Binding Background, RelativeSource={RelativeSource Self}}"
+                                             Background="{DynamicResource MaterialDesignBackground}"
+                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                                             Foreground="{DynamicResource MaterialDesignBody}"
+                                             FontSize="14"
+                                             FontWeight="SemiBold"
+                                             Height="44"
+                                             Padding="10,6"
+                                             VerticalAlignment="Center"
+                                             GotKeyboardFocus="ManualMagazineNoTextBox_GotKeyboardFocus"
+                                             LostKeyboardFocus="ManualMagazineNoTextBox_LostKeyboardFocus"/>
+                                    <Button Grid.Column="1"
+                                            Command="{Binding SendMagazineNoCommand}"
+                                            Height="44" MinWidth="80" Margin="6,0,0,0" Padding="10,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Send" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <TextBlock Text="Send" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- Saved Magazines Panel (DataGrid with Clear & Clear All) -->
+                            <Grid Grid.Row="4" Margin="0,2,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Header with Clear All -->
+                                <Grid Grid.Row="0" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialDesign:PackIcon Kind="BookmarkMultiple" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Text="Magazine đã lưu" Style="{StaticResource CaptionStyle}" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBody}"/>
+                                        <TextBlock Text="{Binding SavedMagazines.Count, StringFormat=' ({0})'}" Style="{StaticResource CaptionStyle}" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Command="{Binding ClearAllMagazinesCommand}"
+                                            Height="24" Padding="6,0"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                                            ToolTip="Xóa tất cả magazine đã lưu">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Broom" Width="12" Height="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <TextBlock Text="Clear All" FontSize="11"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+
+                                <!-- DataGrid of Saved Magazines -->
+                                <DataGrid Grid.Row="1"
+                                          ItemsSource="{Binding SavedMagazines}"
+                                          SelectedItem="{Binding SelectedSavedMagazine, Mode=TwoWay}"
+                                          AutoGenerateColumns="False"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          IsReadOnly="True"
+                                          GridLinesVisibility="Horizontal"
+                                          HeadersVisibility="Column"
+                                          Background="Transparent"
+                                          BorderThickness="1"
+                                          BorderBrush="{DynamicResource MaterialDesignDivider}"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          FontSize="11">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Magazine No" Binding="{Binding MagazineNo}" Width="1.5*"/>
+                                        <DataGridTextColumn Header="Qty" Binding="{Binding Qty}" Width="0.5*"/>
+                                        <DataGridTextColumn Header="QPM" Binding="{Binding Qpm}" Width="0.5*"/>
+                                        <DataGridTextColumn Header="Thời gian" Binding="{Binding SavedTimeFormatted}" Width="1.5*"/>
+                                        <DataGridTemplateColumn Header="Action" Width="0.6*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.ClearMagazineCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource MaterialDesignToolButton}"
+                                                            Height="22" Width="22" Padding="0"
+                                                            ToolTip="Xóa magazine này">
+                                                        <materialDesign:PackIcon Kind="Close" Width="14" Height="14" Foreground="#FF4D4D"/>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
                         </Grid>
-
-                        
-                    </Grid>
-                    <Grid Grid.Row="3">
-                         <TextBox
-                         Text="{Binding HmesMessage}"
-                         materialDesign:HintAssist.Hint="HMES Message"
-                         Style="{StaticResource HmesMessageBoxStyle}"
-                         Height="72"/>
-                    </Grid>
-                </Grid>
-            </Border>
-        </Grid>
-
-        <Border Grid.Row="2" Style="{StaticResource SurfaceStyle}" Margin="4">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <Grid Grid.Row="0" Margin="0,0,0,10">
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="FormatListBulleted" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBlock Text="Logs" Style="{StaticResource SectionTitleStyle}"/>
-                    </StackPanel>
-                </Grid>
-
-                <Grid Grid.Row="1">
-                    <TextBox x:Name="LogTextBox"
-                             Text="{Binding Logs}"
-                             TextWrapping="NoWrap"
-                             Foreground="{DynamicResource MaterialDesignBody}"
-                             FontFamily="Consolas"
-                             FontSize="12"
-                             IsReadOnly="True"
-                             BorderThickness="0"
-                             MinHeight="30"
-                             VerticalScrollBarVisibility="Auto"
-                             HorizontalScrollBarVisibility="Visible"
-                             TextChanged="LogTextBox_TextChanged"
-                             VerticalContentAlignment="Top"
-                             HorizontalAlignment="Stretch"
-                             VerticalAlignment="Stretch"/>
-                    <Border Visibility="{Binding IsMessageOn, Converter={StaticResource BoolToVisibilityConverter}}"
-                            Background="#EE333333"
-                            BorderBrush="#FFFFD000"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="14"
-                            VerticalAlignment="Top"
-                            Margin="10"
-                            MinHeight="72">
-                        <TextBlock Text="{Binding InformationMessage}"
-                                   Foreground="Yellow"
-                                   FontSize="20"
-                                   FontWeight="Bold"
-                                   TextWrapping="Wrap"/>
                     </Border>
                 </Grid>
+
+                <!-- Bottom Banner: Information Message (Full Dashboard Width) -->
+                <Border Grid.Row="2"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="10,6"
+                        Margin="4,4,4,2"
+                        MinHeight="40">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{DynamicResource MaterialDesignBackground}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsMessageOn}" Value="True">
+                                    <Setter Property="Background" Value="#EE333333"/>
+                                    <Setter Property="BorderBrush" Value="#FFFFD000"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <materialDesign:PackIcon Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,10,0">
+                            <materialDesign:PackIcon.Style>
+                                <Style TargetType="materialDesign:PackIcon">
+                                    <Setter Property="Kind" Value="InformationOutline"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBodyLight}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMessageOn}" Value="True">
+                                            <Setter Property="Kind" Value="Warning"/>
+                                            <Setter Property="Foreground" Value="Yellow"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </materialDesign:PackIcon.Style>
+                        </materialDesign:PackIcon>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding InformationMessage}"
+                                   FontSize="14"
+                                   FontWeight="Bold"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMessageOn}" Value="True">
+                                            <Setter Property="Foreground" Value="Yellow"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
             </Grid>
-        </Border>
+        </Viewbox>
     </Grid>
 </Page>

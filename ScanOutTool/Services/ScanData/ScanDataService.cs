@@ -58,5 +58,20 @@ namespace ScanOutTool.Services
         {
             return _dataExecuter.PrintManual();
         }
+
+        public Task<bool> SaveLabelAsync()
+        {
+            return _dataExecuter.SaveLabelAsync();
+        }
+
+        public Task<bool> SearchMagazineNoAsync(string magazineNo)
+        {
+            return _dataExecuter.SearchMagazineNoAsync(magazineNo);
+        }
+
+        public Task<bool> SetTransactionTypeAsync(string transactionType)
+        {
+            return _dataExecuter.SetTransactionTypeAsync(transactionType);
+        }
     }
 }
