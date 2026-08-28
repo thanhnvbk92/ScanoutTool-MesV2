@@ -94,6 +94,7 @@ namespace ScanOutTool.Services
                 Success = response.Success,
                 Ready = response.Ready,
                 Completed = response.Completed,
+                PartChanged = response.PartChanged,
                 ResultCode = response.ResultCode ?? string.Empty,
                 Message = response.Message ?? string.Empty,
                 PID = response.PID ?? string.Empty,

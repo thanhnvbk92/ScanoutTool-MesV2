@@ -11,5 +11,6 @@ namespace ScanOutTool.Models
         public string ShopFloorExePath { get; set; }
         public string ShopFloorLogPath { get; set; } = "C:\\Admin\\Documents\\LG CNS\\ezMES\\Logs";
         public bool SkipHmesWeb { get; set; }
+        public string LastRunMode { get; set; } = nameof(RunMode.ScanOut_Rescan);
     }
 }

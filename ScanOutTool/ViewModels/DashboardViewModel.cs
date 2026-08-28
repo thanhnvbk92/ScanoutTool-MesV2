@@ -75,6 +75,18 @@ namespace ScanOutTool.ViewModels
             UpdateRunModes();
         }
 
+        partial void OnSelectedRunModeChanged(RunMode value)
+        {
+            if (_configService == null || value == RunMode.None)
+            {
+                return;
+            }
+
+            _configService.Config.LastRunMode = value.ToString();
+            _configService.Save();
+            _loggingService?.LogInformation($"Saved last run mode: {value}");
+        }
+
         private void UpdateRunModes()
         {
             RunModes = Enum.GetValues(typeof(RunMode)).Cast<RunMode>().ToList();
@@ -82,6 +94,17 @@ namespace ScanOutTool.ViewModels
             {
                 SelectedRunMode = RunMode.ScanOut_Rescan;
             }
+        }
+
+        private RunMode LoadLastRunMode()
+        {
+            string savedRunMode = _configService.Config.LastRunMode;
+            if (Enum.TryParse(savedRunMode, ignoreCase: true, out RunMode runMode) && runMode != RunMode.None)
+            {
+                return runMode;
+            }
+
+            return RunMode.ScanOut_Rescan;
         }
         [ObservableProperty] private string logs;
         [ObservableProperty] private string startBtnText;
@@ -682,6 +705,7 @@ namespace ScanOutTool.ViewModels
 
             IsSkipHmesWeb = _configService.Config.SkipHmesWeb;
             UpdateRunModes();
+            SelectedRunMode = LoadLastRunMode();
 
             LoadSavedMagazines();
             LoadPendingScanouts();
@@ -1044,6 +1068,34 @@ namespace ScanOutTool.ViewModels
             _serialProxyManager?.Stop();
         }
 
+        private void StopScanSessionForCleberNotReady(CleberMesScanResult response)
+        {
+            IsStarted = false;
+            _appState.IsRunning = false;
+            StopSerialProxy();
+            _loggingService.LogWarning($"Cleber.MES not ready. Scanning stopped. ResultCode={response.ResultCode}, Message={response.Message}");
+        }
+
+        private void HandleCleberMesFailure(string pid, CleberMesScanResult response, string logPrefix)
+        {
+            if (!response.Ready)
+            {
+                StopScanSessionForCleberNotReady(response);
+                ShowWarningMessage($"Cleber.MES not ready: {response.ResultCode} {response.Message}");
+                return;
+            }
+
+            if (response.IsPartChanged)
+            {
+                ShowWarningMessage($"PART_NO_CHANGED: {response.Message}");
+                _loggingService.LogWarning($"{logPrefix} PART_NO_CHANGED: PID={pid}, Tray={response.TrayId}, Qty={response.CurrentQty}/{response.MaxQty}, Message={response.Message}");
+                return;
+            }
+
+            ShowWarningMessage($"Cleber.MES NG: {response.ResultCode} {response.Message}");
+            _loggingService.LogWarning($"{logPrefix} NG: PID={pid}, Success={response.Success}, Ready={response.Ready}, PartChanged={response.PartChanged}, ResultCode={response.ResultCode}, Message={response.Message}");
+        }
+
         private async Task<bool> InitScanOutUIAndReadAsync()
         {
             try
@@ -1197,7 +1249,7 @@ namespace ScanOutTool.ViewModels
 
                 item.ErrorMessage = $"Cleber.MES NG: {response.ResultCode} {response.Message}".Trim();
                 SavePendingScanouts();
-                ShowWarningMessage(item.ErrorMessage);
+                HandleCleberMesFailure(item.PID, response, "Cleber.MES PendingScanout");
                 _loggingService.LogWarning($"[PendingScanout] Retry failed for PID '{item.PID}': {item.ErrorMessage}");
                 return false;
             }
@@ -1486,8 +1538,14 @@ namespace ScanOutTool.ViewModels
             }
             else
             {
-                ShowWarningMessage($"Cleber.MES NG: {response.ResultCode} {response.Message}");
-                _loggingService.LogWarning($"Cleber.MES NG: PID={pid}, Success={response.Success}, Ready={response.Ready}, ResultCode={response.ResultCode}, Message={response.Message}");
+                if (!response.Ready && ShouldPersistPendingScanout(SelectedRunMode))
+                {
+                    string errorMessage = $"Cleber.MES not ready: {response.ResultCode} {response.Message}".Trim();
+                    SavePendingScanout(pid, WorkOrder, PartNo, errorMessage);
+                    _loggingService.LogWarning($"Cleber.MES not ready after ShopFloor OK. Pending saved for PID={pid}, Mode={SelectedRunMode}, WorkOrder={WorkOrder}, PartNo={PartNo}.");
+                }
+
+                HandleCleberMesFailure(pid, response, "Cleber.MES");
             }
 
             return response;
@@ -1518,8 +1576,7 @@ namespace ScanOutTool.ViewModels
             }
             else
             {
-                ShowWarningMessage($"Cleber.MES RescanOnly NG: {response.ResultCode} {response.Message}");
-                _loggingService.LogWarning($"Cleber.MES RescanOnly NG: PID={pid}, Success={response.Success}, Ready={response.Ready}, ResultCode={response.ResultCode}, Message={response.Message}");
+                HandleCleberMesFailure(pid, response, "Cleber.MES RescanOnly");
             }
 
             return response;

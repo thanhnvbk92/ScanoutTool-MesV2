@@ -23,6 +23,7 @@ namespace ScanOutTool.Services
         public bool Success { get; init; }
         public bool Ready { get; init; }
         public bool Completed { get; init; }
+        public bool PartChanged { get; init; }
         public string ResultCode { get; init; } = string.Empty;
         public string Message { get; init; } = string.Empty;
         public string PID { get; init; } = string.Empty;
@@ -35,5 +36,6 @@ namespace ScanOutTool.Services
         public string LaneCode { get; init; } = string.Empty;
 
         public bool IsOk => Success && Ready && ResultCode.Equals("OK", System.StringComparison.OrdinalIgnoreCase);
+        public bool IsPartChanged => PartChanged && ResultCode.Equals("PART_NO_CHANGED", System.StringComparison.OrdinalIgnoreCase);
     }
 }
