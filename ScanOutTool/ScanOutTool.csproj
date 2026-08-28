@@ -5,7 +5,7 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>a185a700f6e189dac79b79ff7f30e160.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.0.0.1</Version>
+    <Version>1.0.0.3</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
@@ -70,4 +70,9 @@
   <ItemGroup>
     <Folder Include="Resources\" />
   </ItemGroup>
+  <Target Name="PackagePublishOutput" AfterTargets="Publish" Condition="'$(PublishZipFile)' != '' And '$(UpdateInfoFile)' != ''">
+    <Message Importance="High" Text="Updating $(UpdateInfoFile) to version $(Version) and packaging $(PublishDir) to $(PublishZipFile)" />
+    <XmlPoke XmlInputPath="$(UpdateInfoFile)" Query="/item/version" Value="$(Version)" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$ErrorActionPreference = 'Stop'; $publishDir = '$(PublishDir)'; $zipFile = '$(PublishZipFile)'; $zipDir = Split-Path -Parent $zipFile; if (-not (Test-Path -LiteralPath $zipDir)) { New-Item -ItemType Directory -Path $zipDir -Force | Out-Null }; if (Test-Path -LiteralPath $zipFile) { Remove-Item -LiteralPath $zipFile -Force }; Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $zipFile -Force&quot;" />
+  </Target>
 </Project>
