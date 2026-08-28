@@ -5,7 +5,11 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>a185a700f6e189dac79b79ff7f30e160.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AssemblyVersion>1.0.4.23</AssemblyVersion>
+    <Version>1.0.0.1</Version>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <FileVersion>$(Version)</FileVersion>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <PlatformTarget>AnyCPU</PlatformTarget>
 	  <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
@@ -20,6 +24,15 @@
     <Content Include="Assets\ScannerBeepSound.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Assets\UserGuide.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="HSSMES.Cleber.MES.Client.IVIPipe">
+      <HintPath>..\Lib\IVI_ScanOutTool_CleberMES_Deployment_V1.3\03_IVIPipe_Library\HSSMES.Cleber.MES.Client.IVIPipe.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />

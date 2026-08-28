@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO.Ports;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace SerialProxyLib
@@ -96,8 +97,11 @@ namespace SerialProxyLib
                 byte[] bytes = new byte[port.BytesToRead];
                 int bytesRead = port.Read(bytes, 0, bytes.Length);
                 
-                // Chuyển sang string và đưa vào buffer nội bộ
-                string data = port.Encoding.GetString(bytes, 0, bytesRead).Replace("\0", "");
+                // Scanner terminates some scans with NUL bytes instead of CR/LF.
+                string rawData = port.Encoding.GetString(bytes, 0, bytesRead);
+                string data = ReferenceEquals(port, _devicePort)
+                    ? Regex.Replace(rawData, @"(?:\0|#NUL)+", "\r")
+                    : rawData.Replace("\0", "");
                 lock (buffer)
                 {
                     buffer.Append(data);

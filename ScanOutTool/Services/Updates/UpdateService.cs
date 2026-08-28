@@ -11,9 +11,7 @@ namespace ScanOutTool.Services
     {
         public async Task CheckForUpdatesAsync()
         {
-            Update.Updatefile = "Software/Update_ScanOutTool_Manual.xml";
-            Update.ExtraProcessesToKill.Add("chromedriver");
-            Update.ExtraProcessesToKill.Add("chrome");
+            Update.Updatefile = "Software/Update_ScanOutTool_MESV2.xml";
 
             Update.Start("10.224.142.245", "admin", "111111");
             await Task.CompletedTask;

@@ -130,6 +130,7 @@ namespace ScanOutTool
             services.AddSingleton<IAudioNotificationService, AudioNotificationService>();
             services.AddSingleton<IShopFloorService, ShopFloorService>();
             services.AddSingleton<IScanDataService, ScanDataService>();
+            services.AddSingleton<ICleberMesService, CleberMesService>();
             //services.AddSingleton<IShowRescanResultService, ShowRescanResultService>();
             //services.AddSingleton<IAutoScanOutUI, AutoScanOutUI>();
 

@@ -28,7 +28,6 @@ namespace ScanOutTool.ViewModels
         private enum HmesBlockAction
         {
             AllowFullFlow,
-            SkipWebAfterShopFloor,
             StopBeforeShopFloor
         }
 
@@ -40,9 +39,9 @@ namespace ScanOutTool.ViewModels
         private readonly IAudioNotificationService _audioNotificationService;
         private readonly IShopFloorService _shopFloorService;
         private readonly IScanDataService _scanDataService;
+        private readonly ICleberMesService _cleberMesService;
 
         private SerialProxyManager _serialProxyManager;
-        private readonly HashSet<string> _skipWebSendPids = new(StringComparer.OrdinalIgnoreCase);
         private readonly DispatcherTimer _hmesRefreshTimer = new();
         private bool _shouldClearShopFloorBeforeNextPid;
         private bool _isRefreshingHmesInfo;
@@ -78,18 +77,10 @@ namespace ScanOutTool.ViewModels
 
         private void UpdateRunModes()
         {
-            if (IsSkipHmesWeb)
+            RunModes = Enum.GetValues(typeof(RunMode)).Cast<RunMode>().ToList();
+            if (SelectedRunMode == RunMode.None || !RunModes.Contains(SelectedRunMode))
             {
-                RunModes = new List<RunMode> { RunMode.ScanOutOnly };
-                SelectedRunMode = RunMode.ScanOutOnly;
-            }
-            else
-            {
-                RunModes = Enum.GetValues(typeof(RunMode)).Cast<RunMode>().ToList();
-                if (SelectedRunMode == RunMode.None || !RunModes.Contains(SelectedRunMode))
-                {
-                    SelectedRunMode = RunMode.ScanOut_Rescan;
-                }
+                SelectedRunMode = RunMode.ScanOut_Rescan;
             }
         }
         [ObservableProperty] private string logs;
@@ -119,6 +110,9 @@ namespace ScanOutTool.ViewModels
         [ObservableProperty] private string inputMagazineNo = string.Empty;
         [ObservableProperty] private System.Collections.ObjectModel.ObservableCollection<SavedMagazineItem> savedMagazines = new();
         [ObservableProperty] private SavedMagazineItem selectedSavedMagazine;
+        [ObservableProperty] private System.Collections.ObjectModel.ObservableCollection<PendingScanoutItem> pendingScanouts = new();
+        [ObservableProperty] private PendingScanoutItem selectedPendingScanout;
+        [ObservableProperty] private bool isPendingScanoutRetrying;
 
         partial void OnSelectedSavedMagazineChanged(SavedMagazineItem value)
         {
@@ -131,6 +125,13 @@ namespace ScanOutTool.ViewModels
         partial void OnInformationMessageChanged(string value)
         {
             IsMessageOn = !string.IsNullOrWhiteSpace(value);
+        }
+
+        private void ClearOperationMessages()
+        {
+            InformationMessage = string.Empty;
+            HmesMessage = string.Empty;
+            IsMessageOn = false;
         }
 
         [RelayCommand]
@@ -153,6 +154,25 @@ namespace ScanOutTool.ViewModels
                 _loggingService.LogInformation("Đã xóa tất cả Magazine No đã lưu.");
                 SaveSavedMagazines();
             }
+        }
+
+        [RelayCommand]
+        private async Task RetryPendingScanout(PendingScanoutItem item)
+        {
+            if (item == null || IsPendingScanoutRetrying)
+            {
+                return;
+            }
+
+            ClearOperationMessages();
+            await RetryPendingScanoutAsync(item);
+        }
+
+        [RelayCommand]
+        private async Task RetryAllPendingScanouts()
+        {
+            ClearOperationMessages();
+            await RetryAllPendingScanoutsAsync();
         }
 
         private void AddCurrentMagazineToSavedList()
@@ -192,6 +212,19 @@ namespace ScanOutTool.ViewModels
                 Directory.CreateDirectory(resourcesDir);
             }
             return Path.Combine(resourcesDir, "saved_magazines.json");
+        }
+
+        private string GetPendingScanoutsFilePath()
+        {
+            string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? AppDomain.CurrentDomain.BaseDirectory;
+            string exeDirectory = Path.GetDirectoryName(exePath) ?? AppDomain.CurrentDomain.BaseDirectory;
+            string resourcesDir = Path.Combine(exeDirectory, "Resources");
+            if (!Directory.Exists(resourcesDir))
+            {
+                Directory.CreateDirectory(resourcesDir);
+            }
+
+            return Path.Combine(resourcesDir, "pending_scanout.json");
         }
 
         private void LoadSavedMagazines()
@@ -242,6 +275,122 @@ namespace ScanOutTool.ViewModels
             }
         }
 
+        private void LoadPendingScanouts()
+        {
+            try
+            {
+                string filePath = GetPendingScanoutsFilePath();
+                if (!File.Exists(filePath))
+                {
+                    return;
+                }
+
+                string json = File.ReadAllText(filePath);
+                var items = JsonConvert.DeserializeObject<List<PendingScanoutItem>>(json);
+                if (items == null)
+                {
+                    return;
+                }
+
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    PendingScanouts.Clear();
+                    foreach (var item in items.Where(x => !string.IsNullOrWhiteSpace(x.PID)))
+                    {
+                        PendingScanouts.Add(item);
+                    }
+                });
+
+                _loggingService.LogInformation($"[PendingScanout] Loaded {PendingScanouts.Count} pending ScanOut item(s).");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[PendingScanout] Failed to load pending ScanOut file: {ex.Message}");
+            }
+        }
+
+        private void SavePendingScanouts()
+        {
+            try
+            {
+                string filePath = GetPendingScanoutsFilePath();
+                List<PendingScanoutItem> items;
+                lock (PendingScanouts)
+                {
+                    items = PendingScanouts.ToList();
+                }
+
+                string json = JsonConvert.SerializeObject(items, Formatting.Indented);
+                File.WriteAllText(filePath, json);
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[PendingScanout] Failed to save pending ScanOut file: {ex.Message}");
+            }
+        }
+
+        private void SavePendingScanout(string pid, string workOrder, string partNo, string errorMessage)
+        {
+            if (string.IsNullOrWhiteSpace(pid))
+            {
+                return;
+            }
+
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                var existing = PendingScanouts.FirstOrDefault(x => x.PID.Equals(pid.Trim(), StringComparison.OrdinalIgnoreCase));
+                if (existing == null)
+                {
+                    PendingScanouts.Insert(0, new PendingScanoutItem
+                    {
+                        PID = pid.Trim(),
+                        WorkOrder = workOrder?.Trim() ?? string.Empty,
+                        PartNo = partNo?.Trim() ?? string.Empty,
+                        ErrorMessage = errorMessage,
+                        FailedTime = DateTime.Now
+                    });
+                }
+                else
+                {
+                    existing.WorkOrder = workOrder?.Trim() ?? existing.WorkOrder;
+                    existing.PartNo = partNo?.Trim() ?? existing.PartNo;
+                    existing.ErrorMessage = errorMessage;
+                    existing.FailedTime = DateTime.Now;
+                }
+            });
+
+            SavePendingScanouts();
+        }
+
+        private void RemovePendingScanout(string pid)
+        {
+            if (string.IsNullOrWhiteSpace(pid))
+            {
+                return;
+            }
+
+            bool removed = false;
+            Application.Current?.Dispatcher?.Invoke(() =>
+            {
+                var existing = PendingScanouts.FirstOrDefault(x => x.PID.Equals(pid.Trim(), StringComparison.OrdinalIgnoreCase));
+                if (existing != null)
+                {
+                    PendingScanouts.Remove(existing);
+                    removed = true;
+                }
+            });
+
+            if (removed)
+            {
+                SavePendingScanouts();
+            }
+        }
+
+        private static bool ShouldPersistPendingScanout(RunMode runMode)
+        {
+            return runMode == RunMode.ScanOut_Rescan || runMode == RunMode.ScanOutOnly;
+        }
+
         partial void OnIsTransactionTypeNormalChanged(bool value)
         {
             if (value)
@@ -265,20 +414,14 @@ namespace ScanOutTool.ViewModels
         partial void OnIsStartedChanged(bool value)
         {
             StartBtnText = value ? "STOP" : "START";
-            if (value && !IsSkipHmesWeb)
-            {
-                StartHmesRefreshTimer();
-            }
-            else
-            {
-                StopHmesRefreshTimer();
-            }
+            StopHmesRefreshTimer();
         }
 
 
         [RelayCommand]
         private async Task Start()
         {
+            ClearOperationMessages();
             if (!IsStarted)
             {
                 IsSessionStarting = true;
@@ -291,25 +434,20 @@ namespace ScanOutTool.ViewModels
                     bool startSuccess = await Task.Run(async () =>
                     {
                         ShopFloorExePath = _configService.Config.ShopFloorExePath;
-                        IsSkipHmesWeb = _configService.Config.SkipHmesWeb;
+                        IsSkipHmesWeb = false;
                         UpdateRunModes();
 
-                        if (!IsSkipHmesWeb)
-                        {
-                            KillProcess.KillChromeAndDriver();
-                        }
-
                         bool[] initResults;
-                        if (IsSkipHmesWeb)
+                        if (IsRescanOnly)
                         {
                             _loggingService.LogInformation("Chế độ Skip HMES Web được bật: Bỏ qua khởi tạo trình duyệt Chrome.");
-                            initResults = new bool[] { await InitScanOutUIAndReadAsync(), true };
+                            initResults = new bool[] { await CheckCleberMesReadyAsync() };
                         }
                         else
                         {
                             initResults = await Task.WhenAll(
                                 InitScanOutUIAndReadAsync(),
-                                StartDataExecuteSessionAsync()
+                                CheckCleberMesReadyAsync()
                             );
                         }
 
@@ -356,6 +494,7 @@ namespace ScanOutTool.ViewModels
         [RelayCommand]
         private async Task ManualPrint()
         {
+            ClearOperationMessages();
             try
             {
                 IsDataSending = true;
@@ -385,6 +524,7 @@ namespace ScanOutTool.ViewModels
         [RelayCommand]
         private async Task SaveLabel()
         {
+            ClearOperationMessages();
             try
             {
                 IsDataSending = true;
@@ -418,6 +558,7 @@ namespace ScanOutTool.ViewModels
         [RelayCommand]
         private async Task SendMagazineNo()
         {
+            ClearOperationMessages();
             if (string.IsNullOrWhiteSpace(InputMagazineNo))
             {
                 ShowWarningMessage("Vui lòng nhập Magazine No trước khi nhấn Send.");
@@ -477,6 +618,7 @@ namespace ScanOutTool.ViewModels
 
         private void ExecuteShopFloorButton(string actionName, Func<bool> action)
         {
+            ClearOperationMessages();
             try
             {
                 bool success = action();
@@ -504,7 +646,8 @@ namespace ScanOutTool.ViewModels
             IBlockRFService blockRFService,
             IAudioNotificationService audioNotificationService,
             IShopFloorService shopFloorService,
-            IScanDataService scanDataService)
+            IScanDataService scanDataService,
+            ICleberMesService cleberMesService)
         {
             _loggingService = loggingService;
             _configService = configService;
@@ -514,6 +657,7 @@ namespace ScanOutTool.ViewModels
             _audioNotificationService = audioNotificationService;
             _shopFloorService = shopFloorService;
             _scanDataService = scanDataService;
+            _cleberMesService = cleberMesService;
 
             _hmesRefreshTimer.Interval = TimeSpan.FromSeconds(2);
             _hmesRefreshTimer.Tick += async (_, _) => await RefreshHmesInfoFromTimerAsync();
@@ -540,6 +684,8 @@ namespace ScanOutTool.ViewModels
             UpdateRunModes();
 
             LoadSavedMagazines();
+            LoadPendingScanouts();
+            _ = Application.Current.Dispatcher.BeginInvoke(async () => await RetryAllPendingScanoutsAsync());
         }
 
         private void LoggerService_OnNewLog(object? sender, LogEntry e)
@@ -647,6 +793,8 @@ namespace ScanOutTool.ViewModels
                     return;
                 }
 
+                ClearOperationMessages();
+
                 if (await TryHandleSpecialScannerDataAsync(data))
                 {
                     return;
@@ -667,7 +815,6 @@ namespace ScanOutTool.ViewModels
 
                 _audioNotificationService.PlayBeep();
                 mainSW.Restart();
-                IsMessageOn = false;
                 _loggingService.LogInformation($"[Event] Device gửi: {data}");
 
                 PID = pid;
@@ -677,21 +824,11 @@ namespace ScanOutTool.ViewModels
                     return;
                 }
 
+                _loggingService.LogInformation($"Check HMES block: {data}");
                 HmesBlockAction hmesBlockAction = CheckHmesBlock(pid);
                 if (hmesBlockAction == HmesBlockAction.StopBeforeShopFloor)
                 {
                     return;
-                }
-
-                if (hmesBlockAction == HmesBlockAction.SkipWebAfterShopFloor)
-                {
-                    if (IsRescanOnly)
-                    {
-                        _loggingService.LogWarning($"Bỏ qua gửi web/rescan cho PID {pid} do HMES block trong Rescan only mode.");
-                        return;
-                    }
-
-                    MarkSkipWebSendAfterShopFloor(pid);
                 }
 
                 if (IsRescanOnly)
@@ -781,7 +918,7 @@ namespace ScanOutTool.ViewModels
                 return false;
             }
 
-            ShowWarningMessage($"PID {pid} đã bị chặn do NG RF ở jig {rFInfo.MachineIP} band {rFInfo.Band} sinal{rFInfo.Signpath} antenal number {rFInfo.AntNumber} value {rFInfo.ValueNg}");
+            ShowWarningMessage($"PID {pid} đã bị chặn do NG RF ở jig {rFInfo.MachineIP} band {rFInfo.Band} signal {rFInfo.Signpath} antenna number {rFInfo.AntNumber} value {rFInfo.ValueNg}");
             _loggingService.LogWarning($"PID {pid} bị RF block");
             return true;
         }
@@ -792,34 +929,18 @@ namespace ScanOutTool.ViewModels
 
             if (!isHSMESBlocked)
             {
-                _skipWebSendPids.Remove(pid);
                 return HmesBlockAction.AllowFullFlow;
             }
 
-            if (IsXrayBlock(reason))
-            {
-                ShowHmesBlockedMessage(pid, reason);
-                return HmesBlockAction.StopBeforeShopFloor;
-            }
 
-            ShowWarningMessage($"PID {pid} đã bị block do {reason}");
+            ShowHmesBlockedMessage(pid, reason);
             _loggingService.LogWarning($"PID {pid} bị HMES block do {reason}");
-            return HmesBlockAction.SkipWebAfterShopFloor;
-        }
-
-        private void MarkSkipWebSendAfterShopFloor(string pid)
-        {
-            _skipWebSendPids.Add(pid);
+            return HmesBlockAction.StopBeforeShopFloor;
         }
 
         private void ShowHmesBlockedMessage(string pid, string reason)
         {
             ShowWarningMessage($"PID {pid} đã bị block do {reason} , vui lòng kiểm tra lại");
-        }
-
-        private bool ShouldSkipWebSendAfterShopFloor(string pid)
-        {
-            return _skipWebSendPids.Remove(pid.Trim());
         }
 
         private bool ClearShopFloorBeforeNextPidIfNeeded(string pid)
@@ -851,20 +972,6 @@ namespace ScanOutTool.ViewModels
             }
         }
 
-        private static bool IsXrayBlock(string reason)
-        {
-            if (string.IsNullOrWhiteSpace(reason))
-            {
-                return false;
-            }
-
-            string normalizedReason = reason
-                .Replace("-", string.Empty)
-                .Replace(" ", string.Empty);
-
-            return normalizedReason.IndexOf("Xray", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
         private async Task ProcessShopFloorResultAfterForwardAsync(string sentData)
         {
             if (sentData.Contains("CLEAR") || sentData.Contains("TRACE") || IsNone)
@@ -879,13 +986,6 @@ namespace ScanOutTool.ViewModels
             {
                 _shouldClearShopFloorBeforeNextPid = true;
                 _loggingService.LogWarning($"ShopFloor NG for PID {sentData.Trim()}. CLEAR will be executed before next PID.");
-                return;
-            }
-
-            if (ShouldSkipWebSendAfterShopFloor(sentData))
-            {
-                _loggingService.LogWarning($"PID {sentData.Trim()} bị HMES block. Gửi DB HMES nhưng bỏ qua HMES web/rescan.");
-                await SendDataExecuteDatabaseOnlyAsync();
                 return;
             }
 
@@ -906,6 +1006,9 @@ namespace ScanOutTool.ViewModels
 
         private async Task SendRescanOnlyAsync(string data)
         {
+            await SendCleberMesRescanOnlyAsync(data);
+            return;
+
             await _scanDataService.ProcessDataAsync(
                 workOrder: string.Empty,
                 partNo: string.Empty,
@@ -999,6 +1102,31 @@ namespace ScanOutTool.ViewModels
             }
         }
 
+        private async Task<bool> CheckCleberMesReadyAsync()
+        {
+            try
+            {
+                CleberMesScanResult status = await _cleberMesService.GetStatusAsync();
+                ApplyCleberMesResult(status);
+
+                if (status.Success && status.Ready && status.ResultCode.Equals("READY", StringComparison.OrdinalIgnoreCase))
+                {
+                    _loggingService.LogInformation($"Cleber.MES ready: Plant={status.PlantCode}, Line={status.LineCode}, Operation={status.OperationCode}, Lane={status.LaneCode}");
+                    return true;
+                }
+
+                ShowWarningMessage($"Cleber.MES is not ready: {status.ResultCode} {status.Message}");
+                _loggingService.LogWarning($"Cleber.MES status failed: Success={status.Success}, Ready={status.Ready}, ResultCode={status.ResultCode}, Message={status.Message}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                ShowWarningMessage($"Cannot connect to Cleber.MES Named Pipe: {ex.Message}");
+                _loggingService.LogError($"Cleber.MES status error: {ex.Message}");
+                return false;
+            }
+        }
+
         private static void BringDashboardToFront()
         {
             Application.Current.Dispatcher.BeginInvoke(() =>
@@ -1021,6 +1149,72 @@ namespace ScanOutTool.ViewModels
             }, DispatcherPriority.ApplicationIdle);
         }
 
+        private async Task RetryAllPendingScanoutsAsync()
+        {
+            if (IsPendingScanoutRetrying || PendingScanouts.Count == 0)
+            {
+                return;
+            }
+
+            List<PendingScanoutItem> items = PendingScanouts.ToList();
+            foreach (var item in items)
+            {
+                await RetryPendingScanoutAsync(item);
+            }
+        }
+
+        private async Task<bool> RetryPendingScanoutAsync(PendingScanoutItem item)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.PID))
+            {
+                return false;
+            }
+
+            try
+            {
+                ClearOperationMessages();
+                IsPendingScanoutRetrying = true;
+                item.RetryCount++;
+                item.LastRetryTime = DateTime.Now;
+                _loggingService.LogInformation($"[PendingScanout] Retrying PID '{item.PID}' with ScanOutOnly mode.");
+
+                CleberMesScanResult response = await _cleberMesService.SendScanAsync(
+                    RunMode.ScanOutOnly,
+                    item.PID,
+                    item.WorkOrder,
+                    item.PartNo,
+                    string.Empty,
+                    string.Empty);
+
+                ApplyCleberMesResult(response);
+
+                if (response.IsOk)
+                {
+                    RemovePendingScanout(item.PID);
+                    _loggingService.LogInformation($"[PendingScanout] Retry OK. Removed PID '{item.PID}' from pending list.");
+                    return true;
+                }
+
+                item.ErrorMessage = $"Cleber.MES NG: {response.ResultCode} {response.Message}".Trim();
+                SavePendingScanouts();
+                ShowWarningMessage(item.ErrorMessage);
+                _loggingService.LogWarning($"[PendingScanout] Retry failed for PID '{item.PID}': {item.ErrorMessage}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                item.ErrorMessage = ex.Message;
+                SavePendingScanouts();
+                ShowWarningMessage($"Retry ScanOutOnly PID {item.PID} lỗi pipe: {ex.Message}");
+                _loggingService.LogError($"[PendingScanout] Retry pipe error for PID '{item.PID}': {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                IsPendingScanoutRetrying = false;
+            }
+        }
+
         private async Task<bool> SendDataExecuteAsync()
         {
             bool finalResult = false;
@@ -1029,6 +1223,9 @@ namespace ScanOutTool.ViewModels
             try
             {
                 IsDataSending = true;               
+
+                CleberMesScanResult cleberResult = await SendCleberMesScanAsync(PID);
+                return cleberResult.IsOk;
 
                 _loggingService.LogInformation($"Sending data to database: WorkOrder={WorkOrder}, ModelSuffix={PartNo}, WipSerialNumber={PID}");
                 ProcessResult result = new ProcessResult();
@@ -1112,54 +1309,6 @@ namespace ScanOutTool.ViewModels
                 IsDataSending = false;
             }
             return finalResult;
-        }
-
-        private async Task<bool> SendDataExecuteDatabaseOnlyAsync()
-        {
-            if (IsInChooseEBRMode)
-            {
-                return false;
-            }
-
-            try
-            {
-                IsDataSending = true;
-                _loggingService.LogInformation($"Sending database-only HMES data: WorkOrder={WorkOrder}, ModelSuffix={PartNo}, WipSerialNumber={PID}");
-
-                ProcessResult result = await _scanDataService.ProcessDataAsync(
-                    WorkOrder,
-                    PartNo,
-                    PID,
-                    validateDatabase: true,
-                    transferToWeb: false);
-
-                if (!result.Success)
-                {
-                    if (!string.IsNullOrEmpty(result.ValidationResult))
-                    {
-                        _loggingService.LogError($"Validation Error: {result.ValidationResult}");
-                    }
-                    else
-                    {
-                        _loggingService.LogError($"Database-only HMES error: {result.Message}");
-                    }
-
-                    return false;
-                }
-
-                _loggingService.LogInformation($"Database-only HMES send successful for PID {PID}.");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                ResultMessage = $"Error: {ex.Message}";
-                _loggingService.LogError($"Error sending database-only HMES data: {ex.Message}");
-                return false;
-            }
-            finally
-            {
-                IsDataSending = false;
-            }
         }
 
         private async Task<ProcessResult> SendInWOMode()
@@ -1289,6 +1438,100 @@ namespace ScanOutTool.ViewModels
             Result = scanResult.Result;
             Progress = scanResult.Progress;
             ResultMessage = scanResult.Message;
+        }
+
+        private async Task<CleberMesScanResult> SendCleberMesScanAsync(string pid)
+        {
+            ClearOperationMessages();
+            _loggingService.LogInformation($"Sending PID '{pid}' to Cleber.MES: Mode={SelectedRunMode}, WorkOrder={WorkOrder}, PartNo={PartNo}, GMES={Result}");
+
+            CleberMesScanResult response;
+            try
+            {
+                response = await _cleberMesService.SendScanAsync(
+                    SelectedRunMode,
+                    pid,
+                    WorkOrder,
+                    PartNo,
+                    IsScanOutRescan ? Result : string.Empty,
+                    IsScanOutRescan ? ResultMessage : string.Empty);
+            }
+            catch (Exception ex)
+            {
+                if (ShouldPersistPendingScanout(SelectedRunMode))
+                {
+                    SavePendingScanout(pid, WorkOrder, PartNo, ex.Message);
+                    ShowWarningMessage($"Pipe loi khi gui PID {pid}. Da luu vao danh sach retry.");
+                    _loggingService.LogError($"Cleber.MES pipe error. Pending saved for PID={pid}, Mode={SelectedRunMode}, WorkOrder={WorkOrder}, PartNo={PartNo}: {ex.Message}");
+                }
+                else
+                {
+                    ShowWarningMessage($"Pipe loi khi gui PID {pid}: {ex.Message}");
+                    _loggingService.LogError($"Cleber.MES pipe error. Pending not saved for PID={pid}, Mode={SelectedRunMode}: {ex.Message}");
+                }
+
+                throw;
+            }
+
+            ApplyCleberMesResult(response);
+
+            if (response.IsOk)
+            {
+                if (ShouldPersistPendingScanout(SelectedRunMode))
+                {
+                    RemovePendingScanout(pid);
+                }
+
+                _loggingService.LogInformation($"Cleber.MES OK: PID={pid}, Tray={response.TrayId}, Qty={response.CurrentQty}/{response.MaxQty}, Completed={response.Completed}, Message={response.Message}");
+            }
+            else
+            {
+                ShowWarningMessage($"Cleber.MES NG: {response.ResultCode} {response.Message}");
+                _loggingService.LogWarning($"Cleber.MES NG: PID={pid}, Success={response.Success}, Ready={response.Ready}, ResultCode={response.ResultCode}, Message={response.Message}");
+            }
+
+            return response;
+        }
+
+        private async Task<CleberMesScanResult> SendCleberMesRescanOnlyAsync(string pid)
+        {
+            ClearOperationMessages();
+            _loggingService.LogInformation($"Sending PID '{pid}' to Cleber.MES with RescanOnly request.");
+
+            CleberMesScanResult response;
+            try
+            {
+                response = await _cleberMesService.SendRescanOnlyAsync(pid);
+            }
+            catch (Exception ex)
+            {
+                ShowWarningMessage($"Pipe loi khi gui RescanOnly PID {pid}: {ex.Message}");
+                _loggingService.LogError($"Cleber.MES RescanOnly pipe error. Pending not saved for PID={pid}: {ex.Message}");
+                throw;
+            }
+
+            ApplyCleberMesResult(response);
+
+            if (response.IsOk)
+            {
+                _loggingService.LogInformation($"Cleber.MES RescanOnly OK: PID={pid}, Tray={response.TrayId}, Qty={response.CurrentQty}/{response.MaxQty}, Completed={response.Completed}, Message={response.Message}");
+            }
+            else
+            {
+                ShowWarningMessage($"Cleber.MES RescanOnly NG: {response.ResultCode} {response.Message}");
+                _loggingService.LogWarning($"Cleber.MES RescanOnly NG: PID={pid}, Success={response.Success}, Ready={response.Ready}, ResultCode={response.ResultCode}, Message={response.Message}");
+            }
+
+            return response;
+        }
+
+        private void ApplyCleberMesResult(CleberMesScanResult response)
+        {
+            HmesResult = response.ResultCode;
+            HmesMessage = response.Message;
+            HmesPackQty = response.CurrentQty;
+            HmesMagazineQty = response.MaxQty;
+            HmesMagazineNo = response.TrayId;
         }
 
         private async Task RefreshHmesInfoAsync()

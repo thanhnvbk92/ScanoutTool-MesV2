@@ -310,7 +310,7 @@
                         </Border>
                     </Grid>
 
-                    <!-- Right Column: HMES Web Data (Spans Full Height) -->
+                    <!-- Right Column: MESV2 / CleberMES Data -->
                     <Border Grid.Column="1" Style="{StaticResource HmesWebPanelStyle}" IsEnabled="{Binding IsStarted}">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -328,10 +328,10 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <materialDesign:PackIcon Kind="Web" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="HMES Web Data" Style="{StaticResource SectionTitleStyle}"/>
+                                    <materialDesign:PackIcon Kind="ServerNetwork" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="MESV2 / CleberMES Data" Style="{StaticResource SectionTitleStyle}"/>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="Collapsed">
                                     <Button Command="{Binding SaveLabelCommand}"
                                             Height="30" MinWidth="80" Padding="8,0" Margin="0,0,6,0"
                                             Style="{StaticResource MaterialDesignOutlinedButton}">
@@ -351,7 +351,7 @@
                                 </StackPanel>
                             </Grid>
 
-                            <!-- Status & Transaction Type Card -->
+                            <!-- Status Card -->
                             <Border Grid.Row="1" Background="{DynamicResource MaterialDesignPaper}" CornerRadius="6" Padding="10,8" Margin="0,0,0,8" BorderThickness="1" BorderBrush="{DynamicResource MaterialDesignDivider}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -372,8 +372,8 @@
                                         <TextBlock Text="{Binding IsDataSending}" Style="{StaticResource CompactValueStyle}" Margin="0,2,0,0"/>
                                     </StackPanel>
 
-                                    <!-- Transaction Type -->
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                    <!-- Transaction Type: legacy HMES web control, hidden for MESV2 -->
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Visibility="Collapsed">
                                         <TextBlock Text="Trans Type" Style="{StaticResource CaptionStyle}"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                             <RadioButton Content="NORML" IsChecked="{Binding IsTransactionTypeNormal}" Margin="0,0,8,0" GroupName="HmesTransTypeGroup" Foreground="{DynamicResource MaterialDesignBody}" FontSize="12"/>
@@ -383,25 +383,25 @@
                                 </Grid>
                             </Border>
 
-                            <!-- Metrics (Pack Qty, Magazine QPM, Magazine No) -->
+                            <!-- Metrics (Tray Qty, Tray Capacity, Tray ID) -->
                             <UniformGrid Grid.Row="2" Columns="3" Rows="1" Margin="0,0,0,8">
                                 <Border Background="{DynamicResource MaterialDesignPaper}" CornerRadius="6" Padding="8,6" Margin="0,0,4,0" BorderThickness="1" BorderBrush="{DynamicResource MaterialDesignDivider}">
                                     <StackPanel>
-                                        <TextBlock Text="Pack Qty" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="Tray Qty" Style="{StaticResource CaptionStyle}"/>
                                         <TextBlock Text="{Binding HmesPackQty}" Style="{StaticResource ValueStyle}" HorizontalAlignment="Left"/>
                                     </StackPanel>
                                 </Border>
 
                                 <Border Background="{DynamicResource MaterialDesignPaper}" CornerRadius="6" Padding="8,6" Margin="2,0,2,0" BorderThickness="1" BorderBrush="{DynamicResource MaterialDesignDivider}">
                                     <StackPanel>
-                                        <TextBlock Text="Magazine QPM" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="Tray Capacity" Style="{StaticResource CaptionStyle}"/>
                                         <TextBlock Text="{Binding HmesMagazineQty}" Style="{StaticResource ValueStyle}" HorizontalAlignment="Left"/>
                                     </StackPanel>
                                 </Border>
 
                                 <Border Background="{DynamicResource MaterialDesignPaper}" CornerRadius="6" Padding="8,6" Margin="4,0,0,0" BorderThickness="1" BorderBrush="{DynamicResource MaterialDesignDivider}">
                                     <StackPanel>
-                                        <TextBlock Text="Magazine No" Style="{StaticResource CaptionStyle}"/>
+                                        <TextBlock Text="Tray ID" Style="{StaticResource CaptionStyle}"/>
                                         <TextBox Text="{Binding HmesMagazineNo, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource MaterialDesignBody}" FontSize="14" FontWeight="Bold" Padding="0" Margin="0,2,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
@@ -409,14 +409,14 @@
 
                             <!-- Message & Search Input -->
                             <StackPanel Grid.Row="3" Margin="0,0,0,8">
-                                <!-- HMES Message Box -->
+                                <!-- MESV2 Message Box -->
                                 <TextBox Text="{Binding HmesMessage}"
-                                         materialDesign:HintAssist.Hint="HMES Message"
+                                         materialDesign:HintAssist.Hint="MESV2 Message"
                                          Style="{StaticResource HmesMessageBoxStyle}"
                                          Height="45" Margin="0,0,0,8"/>
 
-                                <!-- Manual Magazine Search Input -->
-                                <Grid>
+                                <!-- Legacy HMES manual magazine search hidden for MESV2 -->
+                                <Grid Visibility="Collapsed">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
@@ -449,8 +449,77 @@
                                 </Grid>
                             </StackPanel>
 
-                            <!-- Saved Magazines Panel (DataGrid with Clear & Clear All) -->
                             <Grid Grid.Row="4" Margin="0,2,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <materialDesign:PackIcon Kind="AlertCircleOutline" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#FFB020"/>
+                                        <TextBlock Text="Pending ScanOut" Style="{StaticResource CaptionStyle}" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBody}"/>
+                                        <TextBlock Text="{Binding PendingScanouts.Count, StringFormat=' ({0})'}" Style="{StaticResource CaptionStyle}" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Command="{Binding RetryAllPendingScanoutsCommand}"
+                                            Height="24"
+                                            Padding="6,0"
+                                            IsEnabled="{Binding IsPendingScanoutRetrying, Converter={StaticResource InverseBoolConverter}}"
+                                            Style="{StaticResource MaterialDesignOutlinedButton}"
+                                            ToolTip="Retry tất cả bằng ScanOutOnly">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Refresh" Width="12" Height="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <TextBlock Text="Retry All" FontSize="11"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+
+                                <DataGrid Grid.Row="1"
+                                          ItemsSource="{Binding PendingScanouts}"
+                                          SelectedItem="{Binding SelectedPendingScanout, Mode=TwoWay}"
+                                          AutoGenerateColumns="False"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          IsReadOnly="True"
+                                          GridLinesVisibility="Horizontal"
+                                          HeadersVisibility="Column"
+                                          Background="Transparent"
+                                          BorderThickness="1"
+                                          BorderBrush="{DynamicResource MaterialDesignDivider}"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          FontSize="11">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="PID" Binding="{Binding PID}" Width="1.2*"/>
+                                        <DataGridTextColumn Header="WO" Binding="{Binding WorkOrder}" Width="1*"/>
+                                        <DataGridTextColumn Header="Part No" Binding="{Binding PartNo}" Width="1*"/>
+                                        <DataGridTextColumn Header="Error" Binding="{Binding ErrorMessage}" Width="1.8*"/>
+                                        <DataGridTextColumn Header="Failed" Binding="{Binding FailedTimeFormatted}" Width="1.1*"/>
+                                        <DataGridTextColumn Header="Retry" Binding="{Binding RetryCount}" Width="0.5*"/>
+                                        <DataGridTemplateColumn Header="Action" Width="0.6*">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Command="{Binding DataContext.RetryPendingScanoutCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource MaterialDesignToolButton}"
+                                                            Height="22" Width="22" Padding="0"
+                                                            ToolTip="Retry bằng ScanOutOnly">
+                                                        <materialDesign:PackIcon Kind="Send" Width="14" Height="14"/>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+
+                            <!-- Legacy HMES saved magazines hidden for MESV2 -->
+                            <Grid Grid.Row="4" Margin="0,2,0,0" Visibility="Collapsed">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>

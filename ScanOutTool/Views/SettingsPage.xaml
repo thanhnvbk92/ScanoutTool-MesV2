@@ -55,7 +55,7 @@
                         <materialDesign:PackIcon Kind="CogOutline" Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock Text="System Settings" Style="{StaticResource SectionTitleStyle}"/>
                     </StackPanel>
-                    <TextBlock Text="Configure HMES server, ShopFloor startup path, and serial ports before pressing START."
+                    <TextBlock Text="Configure MESV2/CleberMES connection, ShopFloor startup path, and serial ports before pressing START."
                                Style="{StaticResource CaptionStyle}"/>
                 </StackPanel>
 
@@ -90,7 +90,7 @@
 
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                             <materialDesign:PackIcon Kind="ServerNetwork" Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <TextBlock Text="HMES / Database" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="MESV2 / CleberMES" Style="{StaticResource SectionTitleStyle}"/>
                         </StackPanel>
 
                         <Grid Grid.Row="1">
@@ -114,10 +114,11 @@
                                       Margin="0,0,12,0"/>
 
                             <CheckBox Grid.Column="2"
-                                      Content="Skip HMES Web"
+                                      Content="Legacy Web Skip"
                                       IsChecked="{Binding SkipHmesWeb}"
                                       VerticalAlignment="Center"
-                                      Foreground="{DynamicResource MaterialDesignBody}"/>
+                                      Foreground="{DynamicResource MaterialDesignBody}"
+                                      Visibility="Collapsed"/>
                         </Grid>
                     </Grid>
                 </Border>

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hướng dẫn sử dụng Scan Out Tool</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #303030; color: #f2f2f2; font: 14px "Segoe UI", Arial, sans-serif; line-height: 1.55; }
+    main { max-width: 1000px; margin: 0 auto; padding: 28px; }
+    header { border-bottom: 2px solid #cde734; padding-bottom: 18px; margin-bottom: 24px; }
+    h1 { font-size: 28px; margin: 0 0 6px; color: #ffffff; }
+    h2 { font-size: 19px; color: #d6ef3c; margin: 0 0 12px; }
+    h3 { font-size: 15px; color: #ffffff; margin: 20px 0 6px; }
+    p { margin: 0 0 10px; color: #d2d2d2; }
+    .lead { color: #adadad; font-size: 15px; }
+    section { background: #3d3d3d; border: 1px solid #5a5a5a; border-radius: 6px; padding: 20px; margin: 16px 0; }
+    .note { background: #49451f; border-left: 4px solid #d6ef3c; padding: 12px 14px; color: #fff; }
+    ol, ul { margin: 8px 0 0; padding-left: 22px; }
+    li { margin: 7px 0; color: #d8d8d8; }
+    code { background: #252525; border: 1px solid #5b5b5b; border-radius: 3px; color: #e7f76c; padding: 1px 5px; font-family: Consolas, monospace; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; vertical-align: top; padding: 10px; border-bottom: 1px solid #5a5a5a; }
+    th { color: #d6ef3c; width: 32%; }
+    .steps { counter-reset: step; list-style: none; padding: 0; }
+    .steps li { counter-increment: step; position: relative; padding-left: 34px; }
+    .steps li::before { content: counter(step); position: absolute; left: 0; top: 1px; width: 22px; height: 22px; border-radius: 50%; background: #cde734; color: #202020; font-weight: 700; text-align: center; line-height: 22px; }
+    @media (max-width: 640px) { main { padding: 16px; } section { padding: 16px; } h1 { font-size: 23px; } th, td { display: block; width: 100%; } th { padding-bottom: 2px; } td { padding-top: 2px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Hướng dẫn sử dụng Scan Out Tool</h1>
+      <p class="lead">Tài liệu vận hành Dashboard, cấu hình Settings và cập nhật phần mềm.</p>
+    </header>
+
+    <section>
+      <h2>Trước khi vận hành</h2>
+      <ol class="steps">
+        <li>Kiểm tra máy scan, ShopFloor và Cleber.MES Client đang mở màn hình IVI Scan Out.</li>
+        <li>Vào <code>Settings</code>, kiểm tra cổng COM và đường dẫn ShopFloor.</li>
+        <li>Nhấn <code>Save</code>, quay lại <code>Dashboard</code> và nhấn <code>Start</code>.</li>
+      </ol>
+      <p class="note">Không rút hoặc đổi cổng COM khi phiên đang chạy. Dừng phiên trước khi thay đổi cấu hình.</p>
+    </section>
+
+    <section>
+      <h2>Dashboard</h2>
+      <h3>Khởi động phiên</h3>
+      <ol>
+        <li>Chọn <code>Selected EBR/WO</code> và <code>Run Mode</code> phù hợp với line.</li>
+        <li>Nhấn <code>Start</code>. Ứng dụng khởi tạo scanner, ShopFloor khi cần, và kiểm tra MESV2/Cleber.MES Named Pipe.</li>
+        <li>Quan sát ShopFloor Data, MESV2/CleberMES Data và thanh thông báo ở cuối màn hình trước khi scan sản phẩm.</li>
+      </ol>
+      <table>
+        <tr><th>Run Mode</th><th>Ý nghĩa</th></tr>
+        <tr><td>ScanOut_Rescan</td><td>Chạy ShopFloor/GMES trước; khi GMES OK thì gửi SCAN_OUT_RESCAN sang MESV2/CleberMES.</td></tr>
+        <tr><td>ScanOutOnly</td><td>Gửi PID, Work Order và Part No sang MESV2/CleberMES để tạo/kiểm tra LOT, không xử lý Tray/label.</td></tr>
+        <tr><td>RescanOnly</td><td>Không chuyển PID sang ShopFloor; gửi PID sang MESV2/CleberMES để xử lý Rescan từ LOT ScanOutOnly hợp lệ.</td></tr>
+        <tr><td>None</td><td>Tạm dừng xử lý tự động.</td></tr>
+      </table>
+      <h3>Scan PID</h3>
+      <ul>
+        <li>Scan PID khi không chọn ô <code>Nhập Magazine No</code>. PID sẽ đi theo Run Mode đang chọn.</li>
+        <li>Kết quả và thông báo ShopFloor hiển thị bên trái; kết quả MESV2/CleberMES hiển thị bên phải.</li>
+        <li>Các mã lệnh <code>CHOOSE</code>, <code>TRACE</code> và <code>CLEAR</code> được xử lý theo trạng thái vận hành hiện tại.</li>
+      </ul>
+      <h3>Nhập Magazine No từ scanner</h3>
+      <ol>
+        <li>Click vào ô <code>Nhập Magazine No</code>.</li>
+        <li>Các thao tác Magazine/HMES web cũ đã được loại bỏ. Tray, số lượng và label do Cleber.MES xử lý theo response Named Pipe.</li>
+      </ol>
+      <p>Danh sách <code>Magazine đã lưu</code> dùng để theo dõi các magazine đã lưu tem. Dùng nút xóa từng dòng hoặc <code>Clear All</code> khi cần làm sạch danh sách.</p>
+    </section>
+
+    <section>
+      <h2>Settings</h2>
+      <table>
+        <tr><th>MESV2 / CleberMES</th><td>Đảm bảo Cleber.MES Client chạy cùng Windows user với tool, màn hình IVI Scan Out đang mở và STATUS trả về READY. Bật <code>Work Order Mode</code> khi line sử dụng Work Order.</td></tr>
+        <tr><th>ShopFloor</th><td>Chọn đúng file <code>ShopFloor EXE Path</code> và thư mục <code>ShopFloor Log Folder</code> để ứng dụng khởi động và đọc trạng thái ShopFloor.</td></tr>
+        <tr><th>Scanner Port</th><td>Chọn cổng COM đang kết nối máy scan, cùng baud rate, parity, data bits và stop bits với thiết bị.</td></tr>
+        <tr><th>ShopFloor Port</th><td>Chọn cổng COM ảo/port dùng để giao tiếp với ShopFloor. Không chọn trùng cổng scanner.</td></tr>
+      </table>
+      <ol>
+        <li>Điền hoặc chọn các giá trị cần thiết.</li>
+        <li>Nhấn <code>Save</code> để lưu cấu hình.</li>
+        <li>Quay lại Dashboard và nhấn Start để áp dụng cho phiên mới.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Cập nhật phần mềm</h2>
+      <ol class="steps">
+        <li>Kết thúc công việc đang xử lý và đảm bảo ShopFloor/MESV2 không còn request chưa hoàn tất.</li>
+        <li>Chọn biểu tượng <code>Update</code> ở thanh bên trái.</li>
+        <li>Chờ trình cập nhật kiểm tra phiên bản trên máy chủ. Khi có bản mới, làm theo thông báo của trình cập nhật.</li>
+        <li>Sau khi cập nhật hoàn tất, mở lại Scan Out Tool và kiểm tra phiên bản ở thanh tiêu đề.</li>
+      </ol>
+      <p class="note">Cập nhật cần kết nối tới máy chủ nội bộ. Trình cập nhật có thể đóng Chrome và ChromeDriver, vì vậy hãy hoàn tất các thao tác web trước khi chạy cập nhật.</p>
+    </section>
+
+    <section>
+      <h2>Xử lý nhanh</h2>
+      <ul>
+        <li>Không nhận scan: kiểm tra cổng Scanner Port, dây kết nối và trạng thái Start.</li>
+        <li>Không gửi được ShopFloor: kiểm tra ShopFloor Port, đường dẫn EXE và cửa sổ ShopFloor đang hoạt động.</li>
+        <li>Không kết nối được MESV2/CleberMES: kiểm tra Cleber.MES Client, màn hình IVI Scan Out, Windows user, Line/Operation/Lane và Named Pipe READY.</li>
+        <li>Có thông báo lỗi: đọc MESV2 Message, ShopFloor Message và log để xác định mã hoặc kết nối gây lỗi.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
