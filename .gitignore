@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local old Cleber.MES deployment package. The project uses V1.3.
+Lib/IVI_ScanOutTool_CleberMES_Deployment_V1.2/
