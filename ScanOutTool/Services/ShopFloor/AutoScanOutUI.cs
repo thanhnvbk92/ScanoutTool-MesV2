@@ -47,9 +47,14 @@ namespace ScanOutTool.Services
         }
 
         public AutoScanOutUI(ILoggingService loggingService, TimeSpan attachTimeout)
+            : this(loggingService, attachTimeout, int.MaxValue)
+        {
+        }
+
+        public AutoScanOutUI(ILoggingService loggingService, TimeSpan attachTimeout, int maxAttachAttempts)
         {
             _loggingService = loggingService;
-            isAttached = AttachWhenReady(attachTimeout);
+            isAttached = AttachWhenReady(attachTimeout, maxAttachAttempts);
             if (!isAttached)
             {
                 _loggingService.LogWarning($"Could not attach to ready ShopFloor UI. Please check App {processName} and open the ScanOut screen.");
@@ -60,18 +65,21 @@ namespace ScanOutTool.Services
             _timer.Start();
         }
 
-        private bool AttachWhenReady(TimeSpan timeout)
+        private bool AttachWhenReady(TimeSpan timeout, int maxAttachAttempts)
         {
             var sw = Stopwatch.StartNew();
             Exception lastException = null;
             int attempt = 0;
 
-            while (sw.Elapsed < timeout)
+            while (sw.Elapsed < timeout && attempt < maxAttachAttempts)
             {
                 attempt++;
                 try
                 {
-                    _loggingService.LogInformation($"Attaching to ShopFloor UI, attempt {attempt}...");
+                    string attemptText = maxAttachAttempts == int.MaxValue
+                        ? attempt.ToString()
+                        : $"{attempt}/{maxAttachAttempts}";
+                    _loggingService.LogInformation($"Attaching to ShopFloor UI, attempt {attemptText}...");
                     if (TryAttachToScanoutWindow(attempt))
                     {
                         return true;

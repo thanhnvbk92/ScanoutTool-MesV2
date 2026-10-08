@@ -18,6 +18,11 @@ namespace ScanOutTool.Services
             Play("ScannerBeepSound.wav");
         }
 
+        public void PlayOk()
+        {
+            Play("scan_ok.wav");
+        }
+
         public void PlayNg()
         {
             Play("scan_fail.wav");

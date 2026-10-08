@@ -121,22 +121,10 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="HmesWebPanelStyle" TargetType="Border" BasedOn="{StaticResource SurfaceStyle}">
-            <Setter Property="Visibility" Value="Visible"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsSkipHmesWeb}" Value="True">
-                    <Setter Property="Visibility" Value="Collapsed"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
+        <Style x:Key="MesV2PanelStyle" TargetType="Border" BasedOn="{StaticResource SurfaceStyle}"/>
 
         <Style x:Key="LeftColumnGridStyle" TargetType="Grid">
             <Setter Property="Grid.ColumnSpan" Value="1"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsSkipHmesWeb}" Value="True">
-                    <Setter Property="Grid.ColumnSpan" Value="2"/>
-                </DataTrigger>
-            </Style.Triggers>
         </Style>
     </Page.Resources>
 
@@ -311,14 +299,14 @@
                     </Grid>
 
                     <!-- Right Column: MESV2 / CleberMES Data -->
-                    <Border Grid.Column="1" Style="{StaticResource HmesWebPanelStyle}" IsEnabled="{Binding IsStarted}">
+                    <Border Grid.Column="1" Style="{StaticResource MesV2PanelStyle}" IsEnabled="{Binding IsStarted}">
                         <Grid>
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- Header & Action Buttons -->
-                                <RowDefinition Height="Auto"/> <!-- Status & Transaction Type Card -->
-                                <RowDefinition Height="Auto"/> <!-- Metrics (Pack Qty, QPM, Mag No) -->
-                                <RowDefinition Height="Auto"/> <!-- Search & Message Input -->
-                                <RowDefinition Height="*"/>    <!-- Saved Magazines Table -->
+                                <RowDefinition Height="Auto"/> <!-- Header -->
+                                <RowDefinition Height="Auto"/> <!-- Status -->
+                                <RowDefinition Height="Auto"/> <!-- Metrics -->
+                                <RowDefinition Height="Auto"/> <!-- Message -->
+                                <RowDefinition Height="*"/>    <!-- Pending ScanOut -->
                             </Grid.RowDefinitions>
 
                             <!-- Header -->
@@ -331,24 +319,19 @@
                                     <materialDesign:PackIcon Kind="ServerNetwork" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                     <TextBlock Text="MESV2 / CleberMES Data" Style="{StaticResource SectionTitleStyle}"/>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="Collapsed">
-                                    <Button Command="{Binding SaveLabelCommand}"
-                                            Height="30" MinWidth="80" Padding="8,0" Margin="0,0,6,0"
-                                            Style="{StaticResource MaterialDesignOutlinedButton}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="ContentSave" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                            <TextBlock Text="Lưu tem" FontSize="11"/>
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Command="{Binding ManualPrintCommand}"
-                                            Height="30" MinWidth="95" Padding="8,0"
-                                            Style="{StaticResource MaterialDesignOutlinedButton}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="Printer" Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                            <TextBlock Text="Manual Print" FontSize="11"/>
-                                        </StackPanel>
-                                    </Button>
-                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Command="{Binding TrayCompleteCommand}"
+                                        Height="32"
+                                        MinWidth="132"
+                                        Padding="8,0"
+                                        IsEnabled="{Binding IsDataSending, Converter={StaticResource InverseBoolConverter}}"
+                                        Style="{StaticResource MaterialDesignOutlinedButton}"
+                                        ToolTip="Complete current OPEN Tray and print label">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="PrinterCheck" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                        <TextBlock Text="TRAY COMPLETE" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
                             </Grid>
 
                             <!-- Status Card -->
@@ -370,15 +353,6 @@
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="Sending" Style="{StaticResource CaptionStyle}"/>
                                         <TextBlock Text="{Binding IsDataSending}" Style="{StaticResource CompactValueStyle}" Margin="0,2,0,0"/>
-                                    </StackPanel>
-
-                                    <!-- Transaction Type: legacy HMES web control, hidden for MESV2 -->
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Visibility="Collapsed">
-                                        <TextBlock Text="Trans Type" Style="{StaticResource CaptionStyle}"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                            <RadioButton Content="NORML" IsChecked="{Binding IsTransactionTypeNormal}" Margin="0,0,8,0" GroupName="HmesTransTypeGroup" Foreground="{DynamicResource MaterialDesignBody}" FontSize="12"/>
-                                            <RadioButton Content="CANCEL" IsChecked="{Binding IsTransactionTypeCancel}" GroupName="HmesTransTypeGroup" Foreground="{DynamicResource MaterialDesignBody}" FontSize="12"/>
-                                        </StackPanel>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -407,46 +381,12 @@
                                 </Border>
                             </UniformGrid>
 
-                            <!-- Message & Search Input -->
+                            <!-- Message -->
                             <StackPanel Grid.Row="3" Margin="0,0,0,8">
-                                <!-- MESV2 Message Box -->
                                 <TextBox Text="{Binding HmesMessage}"
                                          materialDesign:HintAssist.Hint="MESV2 Message"
                                          Style="{StaticResource HmesMessageBoxStyle}"
                                          Height="45" Margin="0,0,0,8"/>
-
-                                <!-- Legacy HMES manual magazine search hidden for MESV2 -->
-                                <Grid Visibility="Collapsed">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="ManualMagazineNoTextBox"
-                                             Grid.Column="0"
-                                             Text="{Binding InputMagazineNo, UpdateSourceTrigger=PropertyChanged}"
-                                             materialDesign:HintAssist.Hint="Nhập Magazine No"
-                                             materialDesign:HintAssist.IsFloating="True"
-                                             materialDesign:HintAssist.Background="{Binding Background, RelativeSource={RelativeSource Self}}"
-                                             materialDesign:HintAssist.HintPaddingBrush="{Binding Background, RelativeSource={RelativeSource Self}}"
-                                             Background="{DynamicResource MaterialDesignBackground}"
-                                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                             Foreground="{DynamicResource MaterialDesignBody}"
-                                             FontSize="14"
-                                             FontWeight="SemiBold"
-                                             Height="44"
-                                             Padding="10,6"
-                                             VerticalAlignment="Center"
-                                             GotKeyboardFocus="ManualMagazineNoTextBox_GotKeyboardFocus"
-                                             LostKeyboardFocus="ManualMagazineNoTextBox_LostKeyboardFocus"/>
-                                    <Button Grid.Column="1"
-                                            Command="{Binding SendMagazineNoCommand}"
-                                            Height="44" MinWidth="80" Margin="6,0,0,0" Padding="10,0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="Send" Width="15" Height="15" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                            <TextBlock Text="Send" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
                             </StackPanel>
 
                             <Grid Grid.Row="4" Margin="0,2,0,0">
@@ -510,74 +450,6 @@
                                                             Height="22" Width="22" Padding="0"
                                                             ToolTip="Retry bằng ScanOutOnly">
                                                         <materialDesign:PackIcon Kind="Send" Width="14" Height="14"/>
-                                                    </Button>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                    </DataGrid.Columns>
-                                </DataGrid>
-                            </Grid>
-
-                            <!-- Legacy HMES saved magazines hidden for MESV2 -->
-                            <Grid Grid.Row="4" Margin="0,2,0,0" Visibility="Collapsed">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <!-- Header with Clear All -->
-                                <Grid Grid.Row="0" Margin="0,0,0,6">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <materialDesign:PackIcon Kind="BookmarkMultiple" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <TextBlock Text="Magazine đã lưu" Style="{StaticResource CaptionStyle}" FontWeight="Bold" Foreground="{DynamicResource MaterialDesignBody}"/>
-                                        <TextBlock Text="{Binding SavedMagazines.Count, StringFormat=' ({0})'}" Style="{StaticResource CaptionStyle}" FontWeight="Bold"/>
-                                    </StackPanel>
-                                    <Button Grid.Column="1"
-                                            Command="{Binding ClearAllMagazinesCommand}"
-                                            Height="24" Padding="6,0"
-                                            Style="{StaticResource MaterialDesignOutlinedButton}"
-                                            ToolTip="Xóa tất cả magazine đã lưu">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="Broom" Width="12" Height="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                            <TextBlock Text="Clear All" FontSize="11"/>
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-
-                                <!-- DataGrid of Saved Magazines -->
-                                <DataGrid Grid.Row="1"
-                                          ItemsSource="{Binding SavedMagazines}"
-                                          SelectedItem="{Binding SelectedSavedMagazine, Mode=TwoWay}"
-                                          AutoGenerateColumns="False"
-                                          CanUserAddRows="False"
-                                          CanUserDeleteRows="False"
-                                          IsReadOnly="True"
-                                          GridLinesVisibility="Horizontal"
-                                          HeadersVisibility="Column"
-                                          Background="Transparent"
-                                          BorderThickness="1"
-                                          BorderBrush="{DynamicResource MaterialDesignDivider}"
-                                          VerticalScrollBarVisibility="Auto"
-                                          HorizontalScrollBarVisibility="Auto"
-                                          FontSize="11">
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Magazine No" Binding="{Binding MagazineNo}" Width="1.5*"/>
-                                        <DataGridTextColumn Header="Qty" Binding="{Binding Qty}" Width="0.5*"/>
-                                        <DataGridTextColumn Header="QPM" Binding="{Binding Qpm}" Width="0.5*"/>
-                                        <DataGridTextColumn Header="Thời gian" Binding="{Binding SavedTimeFormatted}" Width="1.5*"/>
-                                        <DataGridTemplateColumn Header="Action" Width="0.6*">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Button Command="{Binding DataContext.ClearMagazineCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                            CommandParameter="{Binding}"
-                                                            Style="{StaticResource MaterialDesignToolButton}"
-                                                            Height="22" Width="22" Padding="0"
-                                                            ToolTip="Xóa magazine này">
-                                                        <materialDesign:PackIcon Kind="Close" Width="14" Height="14" Foreground="#FF4D4D"/>
                                                     </Button>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
@@ -650,3 +522,4 @@
         </Viewbox>
     </Grid>
 </Page>
+

@@ -72,6 +72,37 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SidebarListBoxItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource SidebarTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,3,8,3"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="ItemBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="0,6,6,0"
+                                Padding="0">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SidebarItemHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SidebarItemSelectedBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource SidebarSelectedTextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <local:BoolToWidthConverter x:Key="BoolToWidthConverter" />
     </Window.Resources>
 
@@ -82,39 +113,40 @@
         </Grid.ColumnDefinitions>
 
         <!-- Sidebar -->
-        <DockPanel Background="{DynamicResource MaterialDesignBackground}" Grid.Column="0">
+        <DockPanel Background="{DynamicResource SidebarBackgroundBrush}" Grid.Column="0">
             <StackPanel>
                 <Button Command="{Binding ToggleSidebarCommand}" Background="Transparent" BorderThickness="0" Margin="10" HorizontalAlignment="Left">
-                    <materialDesign:PackIcon Kind="Menu" Width="30" Height="30" Foreground="{DynamicResource MaterialDesignBody}" />
+                    <materialDesign:PackIcon Kind="Menu" Width="30" Height="30" Foreground="{DynamicResource SidebarTextBrush}" />
                 </Button>
 
                 <ListBox x:Name="PageListBox" SelectedIndex="{Binding SelectedMenuIndex}" 
                          BorderThickness="0"
                          Background="Transparent"
-                         Foreground="{DynamicResource MaterialDesignBody}"
+                         Foreground="{DynamicResource SidebarTextBrush}"
+                         ItemContainerStyle="{StaticResource SidebarListBoxItemStyle}"
                          Margin="0,20,0,0">
                     <ListBoxItem>
                         <StackPanel Orientation="Horizontal" Margin="10">
-                            <materialDesign:PackIcon Kind="Home" Width="24" Height="24" Foreground="{DynamicResource MaterialDesignBody}" />
-                            <TextBlock Text="Dashboard" Margin="10,0,0,0" Foreground="{DynamicResource MaterialDesignBody}" VerticalAlignment="Center" />
+                            <materialDesign:PackIcon Kind="Home" Width="24" Height="24" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+                            <TextBlock Text="Dashboard" Margin="10,0,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center" />
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem>
                         <StackPanel Orientation="Horizontal" Margin="10">
-                            <materialDesign:PackIcon Kind="Cog" Width="24" Height="24" Foreground="{DynamicResource MaterialDesignBody}" />
-                            <TextBlock Text="Settings" Margin="10,0,0,0" Foreground="{DynamicResource MaterialDesignBody}" VerticalAlignment="Center"/>
+                            <materialDesign:PackIcon Kind="Cog" Width="24" Height="24" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+                            <TextBlock Text="Settings" Margin="10,0,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem>
                         <StackPanel Orientation="Horizontal" Margin="10">
-                            <materialDesign:PackIcon Kind="InformationOutline" Width="24" Height="24" Foreground="{DynamicResource MaterialDesignBody}" />
-                            <TextBlock Text="About" Margin="10,0,0,0" Foreground="{DynamicResource MaterialDesignBody}" VerticalAlignment="Center"/>
+                            <materialDesign:PackIcon Kind="InformationOutline" Width="24" Height="24" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+                            <TextBlock Text="About" Margin="10,0,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
                     <ListBoxItem>
                         <StackPanel Orientation="Horizontal" Margin="10">
-                            <materialDesign:PackIcon Kind="Update" Width="24" Height="24" Foreground="{DynamicResource MaterialDesignBody}" />
-                            <TextBlock Text="Check Update" Margin="10,0,0,0" Foreground="{DynamicResource MaterialDesignBody}" VerticalAlignment="Center"/>
+                            <materialDesign:PackIcon Kind="Update" Width="24" Height="24" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" />
+                            <TextBlock Text="Check Update" Margin="10,0,0,0" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </ListBoxItem>
                 </ListBox>

@@ -1,77 +1,62 @@
-using DataExcuter;
+using Oracle.ManagedDataAccess.Client;
 using System;
-using System.Threading.Tasks;
+using System.Data;
 
 namespace ScanOutTool.Services
 {
     public class ScanDataService : IScanDataService
     {
-        private readonly DataExecuter _dataExecuter;
-
-        public event EventHandler<string> StatusChanged;
-
-        public bool ShouldClearAfterSend => _dataExecuter.ShouldClearAfterSend;
+        private const string DbPort = "1521";
+        private const string DbName = "HSEVNPDB";
+        private const string DbUsername = "INFINITY21_JSMES";
+        private const string DbPassword = "INFINITY21_JSMES";
+        private readonly IConfigService _configService;
 
         public ScanDataService(IConfigService configService)
         {
-            var cfg = configService.Config;
-            _dataExecuter = new DataExecuter(new DataExecuterConfig
-            {
-                DbHost = cfg.ServerIP,
-                WebIpAddress = cfg.ServerIP
-            });
-
-            _dataExecuter.StatusChanged += (sender, status) => StatusChanged?.Invoke(sender, status);
-        }
-
-        public Task<bool> StartSessionAsync()
-        {
-            return _dataExecuter.StartSessionAsync();
+            _configService = configService;
         }
 
         public (bool IsBlocked, string Reason) IsBlocked(string pid)
         {
-            return _dataExecuter.IsBlocked(pid);
+            try
+            {
+                using OracleConnection connection = new(GetConnectionString());
+                connection.Open();
+
+                using OracleCommand command = new()
+                {
+                    Connection = connection,
+                    CommandText = "SELECT REASON FROM TBL_BLOCK WHERE PID = :pid AND STATUS = 0",
+                    CommandType = CommandType.Text
+                };
+
+                command.Parameters.Add("pid", OracleDbType.Varchar2).Value = pid;
+
+                using OracleDataReader reader = command.ExecuteReader();
+                if (reader.Read())
+                {
+                    string reason = reader["REASON"]?.ToString() ?? string.Empty;
+                    return (true, reason);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error checking HMES block status: {ex.Message}");
+            }
+
+            return (false, string.Empty);
         }
 
-        public Task<ProcessResult> ProcessDataAsync(string workOrder, string partNo, string pid, bool validateDatabase = true, bool transferToWeb = true)
+        private string GetConnectionString()
         {
-            return _dataExecuter.ProcessDataAsync(workOrder, partNo, pid, validateDatabase, transferToWeb);
-        }
+            string dbHost = string.IsNullOrWhiteSpace(_configService.Config.ServerIP)
+                ? "10.7.10.56"
+                : _configService.Config.ServerIP;
 
-        public Task<int> GetPackQty()
-        {
-            return _dataExecuter.GetPackQty();
-        }
-
-        public Task<int> GetMagazineQty()
-        {
-            return _dataExecuter.GetMagazineQty();
-        }
-
-        public Task<RescanInfo> GetLastRescanInfo()
-        {
-            return _dataExecuter.GetLastRescanInfo();
-        }
-
-        public Task<bool> PrintManual()
-        {
-            return _dataExecuter.PrintManual();
-        }
-
-        public Task<bool> SaveLabelAsync()
-        {
-            return _dataExecuter.SaveLabelAsync();
-        }
-
-        public Task<bool> SearchMagazineNoAsync(string magazineNo)
-        {
-            return _dataExecuter.SearchMagazineNoAsync(magazineNo);
-        }
-
-        public Task<bool> SetTransactionTypeAsync(string transactionType)
-        {
-            return _dataExecuter.SetTransactionTypeAsync(transactionType);
+            return $"Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={dbHost})(PORT={DbPort}))" +
+                   $"(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME={DbName})));" +
+                   $"User Id={DbUsername};Password={DbPassword};";
         }
     }
 }

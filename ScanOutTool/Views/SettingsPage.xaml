@@ -59,13 +59,25 @@
                                Style="{StaticResource CaptionStyle}"/>
                 </StackPanel>
 
-                <Button Grid.Column="1"
-                        Content="Save"
-                        Command="{Binding SaveCommand}"
-                        MinWidth="104"
-                        Height="40"
-                        FontWeight="SemiBold"
-                        Margin="18,0,0,0"/>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="18,0,0,0">
+                    <ComboBox ItemsSource="{Binding ThemeModes}"
+                              SelectedItem="{Binding SelectedThemeMode}"
+                              Style="{StaticResource MaterialDesignFloatingHintComboBox}"
+                              materialDesign:HintAssist.Hint="Theme"
+                              Width="120"
+                              Height="40"
+                              Foreground="{DynamicResource MaterialDesignBody}"
+                              Margin="0,0,12,0"/>
+
+                    <Button Content="Save"
+                            Command="{Binding SaveCommand}"
+                            MinWidth="104"
+                            Height="40"
+                            FontWeight="SemiBold"/>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -86,6 +98,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
@@ -95,7 +108,7 @@
 
                         <Grid Grid.Row="1">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="160"/>
+                                <ColumnDefinition Width="150"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
@@ -114,11 +127,30 @@
                                       Margin="0,0,12,0"/>
 
                             <CheckBox Grid.Column="2"
-                                      Content="Legacy Web Skip"
-                                      IsChecked="{Binding SkipHmesWeb}"
+                                      Content="Beep khi nhận scan"
+                                      IsChecked="{Binding BeepOnScanReceived}"
                                       VerticalAlignment="Center"
                                       Foreground="{DynamicResource MaterialDesignBody}"
-                                      Visibility="Collapsed"/>
+                                      Margin="0,0,12,0"/>
+                        </Grid>
+
+                        <Grid Grid.Row="2" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="86"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox Text="{Binding XrayApiServer}"
+                                     Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                     materialDesign:HintAssist.Hint="Xray API Server"
+                                     Foreground="{DynamicResource MaterialDesignBody}"
+                                     Margin="0,0,12,0"/>
+
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding XrayApiPort}"
+                                     Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                     materialDesign:HintAssist.Hint="Port"
+                                     Foreground="{DynamicResource MaterialDesignBody}"/>
                         </Grid>
                     </Grid>
                 </Border>

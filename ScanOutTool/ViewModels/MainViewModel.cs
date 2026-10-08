@@ -1,6 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using ScanOutTool.Utilities;
 using ScanOutTool.Services;
 
 namespace ScanOutTool.ViewModels
@@ -30,7 +29,6 @@ namespace ScanOutTool.ViewModels
             //SelectedMenuIndex = 0;
 
             Title = $"Scan Out Tool v{getVersion()}";
-            KillProcess.KillChromeDriver();
         }
 
         [RelayCommand]
@@ -70,3 +68,4 @@ namespace ScanOutTool.ViewModels
 
     }
 }
+

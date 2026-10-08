@@ -88,6 +88,8 @@ namespace ScanOutTool
             var serviceCollection = new ServiceCollection();
             ConfigureServices(serviceCollection);
             Services = serviceCollection.BuildServiceProvider();
+            Services.GetRequiredService<IThemeService>()
+                .ApplyTheme(Services.GetRequiredService<IConfigService>().Config.ThemeMode);
 
             AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
             {
@@ -125,12 +127,14 @@ namespace ScanOutTool
             services.AddSingleton<Services.ILoggingService, Services.LoggingService>();
             services.AddSingleton<Services.IUpdateService, Services.UpdateService>();
             services.AddSingleton<Services.IConfigService, Services.ConfigService>();
+            services.AddSingleton<Services.IThemeService, Services.ThemeService>();
             services.AddSingleton<Models.IAppState, Models.AppState>();
             services.AddSingleton<IBlockRFService, BlockRFService>();
             services.AddSingleton<IAudioNotificationService, AudioNotificationService>();
             services.AddSingleton<IShopFloorService, ShopFloorService>();
             services.AddSingleton<IScanDataService, ScanDataService>();
             services.AddSingleton<ICleberMesService, CleberMesService>();
+            services.AddSingleton<IXrayInspectionService, XrayInspectionService>();
             //services.AddSingleton<IShowRescanResultService, ShowRescanResultService>();
             //services.AddSingleton<IAutoScanOutUI, AutoScanOutUI>();
 

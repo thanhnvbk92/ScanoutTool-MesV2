@@ -64,11 +64,11 @@ namespace ScanOutTool.Services
                     bool isExemptAntenna = (ant != "A1" && ant != "B5");
                     bool isExemptValue = Math.Abs(x.ValueNg) > 500;
 
-                    if (isExemptValue)
-                    {
-                        _loggingService.LogInformation($"RF block for PID {pid} (Ant: {x.AntNumber}, Value: {x.ValueNg}) is exempt because Value > 500.");
-                        return false;
-                    }
+                    //if (isExemptValue)
+                    //{
+                    //    _loggingService.LogInformation($"RF block for PID {pid} (Ant: {x.AntNumber}, Value: {x.ValueNg}) is exempt because Value > 500.");
+                    //    return false;
+                    //}
                     return true;
                 });
 

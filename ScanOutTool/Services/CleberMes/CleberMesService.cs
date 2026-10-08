@@ -25,6 +25,12 @@ namespace ScanOutTool.Services
             return Map(response);
         }
 
+        public async Task<CleberMesScanResult> GetStatusAsync(string pid)
+        {
+            IVIScanOutPipeResponse response = await _client.GetStatusAsync(pid?.Trim() ?? string.Empty);
+            return Map(response);
+        }
+
         public async Task<CleberMesScanResult> SendScanAsync(
             RunMode runMode,
             string pid,
@@ -76,6 +82,21 @@ namespace ScanOutTool.Services
             return Map(response);
         }
 
+        public async Task<CleberMesScanResult> SendTrayCompleteAsync(RunMode runMode, string trayId)
+        {
+            IVIScanOutPipeRequest request = new()
+            {
+                Version = IVIScanOutPipeConstants.ProtocolVersion,
+                Type = IVIScanOutPipeConstants.RequestTypeTrayComplete,
+                RunMode = ToCleberRunMode(runMode),
+                MessageId = Guid.NewGuid().ToString("N"),
+                TrayId = trayId?.Trim() ?? string.Empty
+            };
+
+            IVIScanOutPipeResponse response = await _client.SendTrayCompleteAsync(request);
+            return Map(response);
+        }
+
         private static string ToCleberRunMode(RunMode runMode)
         {
             return runMode switch
@@ -95,8 +116,12 @@ namespace ScanOutTool.Services
                 Ready = response.Ready,
                 Completed = response.Completed,
                 PartChanged = response.PartChanged,
+                LotProcessed = response.LotProcessed,
+                TrayLoaded = response.TrayLoaded,
                 ResultCode = response.ResultCode ?? string.Empty,
+                MesResultCode = response.MesResultCode ?? string.Empty,
                 Message = response.Message ?? string.Empty,
+                Type = response.Type ?? string.Empty,
                 PID = response.PID ?? string.Empty,
                 TrayId = response.TrayId ?? string.Empty,
                 CurrentQty = response.CurrentQty,

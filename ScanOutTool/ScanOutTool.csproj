@@ -5,7 +5,7 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon>a185a700f6e189dac79b79ff7f30e160.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.0.0.3</Version>
+    <Version>1.0.2.2</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
@@ -30,7 +30,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="HSSMES.Cleber.MES.Client.IVIPipe">
-      <HintPath>..\Lib\IVI_ScanOutTool_CleberMES_Deployment_V1.3\03_IVIPipe_Library\HSSMES.Cleber.MES.Client.IVIPipe.dll</HintPath>
+      <HintPath>..\Lib\IVI_ScanOutTool_CleberMES_Deployment_V1.6\03_IVIPipe_Library\HSSMES.Cleber.MES.Client.IVIPipe.dll</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>
@@ -46,6 +46,7 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.4" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.8.0" />
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="WindowsAPICodePack-Core" Version="1.1.2" />
@@ -56,7 +57,6 @@
     <ProjectReference Include="..\Lib\ScanOutLogLib\ScanOutLogLib.csproj" />
     <ProjectReference Include="..\Lib\SerialPortProxy\SerialPortProxy\SerialPortProxy.csproj" />
     <ProjectReference Include="..\Lib\UIAutoLib\UIAutoLib\UIAutoLib.csproj" />
-    <ProjectReference Include="..\Lib\ScanOutRev\DataExcuter\DataExcuter.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\AppIcon.ico" />
