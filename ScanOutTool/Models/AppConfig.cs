@@ -8,6 +8,8 @@ namespace ScanOutTool.Models
         public SerialPortSettingViewModel ShopFloorPortSettingVM { get; set; }
         public bool IsWOMode { get; set; }
         public string ServerIP { get; set; }
+        public string QaBlockApiServer { get; set; } = "http://10.7.10.6:9999";
+        public string QaMachineName { get; set; } = string.Empty;
         public string XrayApiServer { get; set; } = string.Empty;
         public string XrayApiPort { get; set; } = string.Empty;
         public string ShopFloorExePath { get; set; }

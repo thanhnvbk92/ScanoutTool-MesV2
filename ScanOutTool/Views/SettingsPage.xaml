@@ -99,6 +99,8 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
@@ -152,6 +154,20 @@
                                      materialDesign:HintAssist.Hint="Port"
                                      Foreground="{DynamicResource MaterialDesignBody}"/>
                         </Grid>
+
+                        <TextBox Grid.Row="3"
+                                 Text="{Binding QaBlockApiServer}"
+                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                 materialDesign:HintAssist.Hint="QA Block API Server"
+                                 Foreground="{DynamicResource MaterialDesignBody}"
+                                 Margin="0,12,0,0"/>
+
+                        <TextBox Grid.Row="4"
+                                 Text="{Binding QaMachineName}"
+                                 Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                                 materialDesign:HintAssist.Hint="Machine Name"
+                                 Foreground="{DynamicResource MaterialDesignBody}"
+                                 Margin="0,12,0,0"/>
                     </Grid>
                 </Border>
 

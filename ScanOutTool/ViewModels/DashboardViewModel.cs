@@ -23,11 +23,19 @@ namespace ScanOutTool.ViewModels
 {
     public partial class DashboardViewModel : ObservableObject
     {
-        private enum HmesBlockAction
+        private enum QaBlockAction
         {
             AllowFullFlow,
             StopBeforeShopFloor
         }
+
+        private sealed class QueuedScanItem
+        {
+            public string Data { get; init; } = string.Empty;
+            public long EnqueuedTimestamp { get; init; }
+        }
+
+        private const string WorkAlreadyFinishedMessage = "Work already finished.";
 
         private readonly IAppState _appState;
         private readonly ILoggingService _loggingService;
@@ -48,7 +56,7 @@ namespace ScanOutTool.ViewModels
         private const int DuplicateScanThresholdMs = 3000;
         private int _runModeValidationVersion;
 
-        private readonly Channel<string> _scanQueue = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        private readonly Channel<QueuedScanItem> _scanQueue = Channel.CreateUnbounded<QueuedScanItem>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
         private CancellationTokenSource? _queueCts;
         private Task? _queueConsumerTask;
 
@@ -57,8 +65,6 @@ namespace ScanOutTool.ViewModels
         private bool IsScanOutRescan => SelectedRunMode == RunMode.ScanOut_Rescan;
         private bool IsNone => SelectedRunMode == RunMode.None;
         private bool RequiresScanOutUi => RequiresScanOutUiMode(SelectedRunMode);
-
-        private Stopwatch mainSW = new Stopwatch();
 
         [ObservableProperty] private bool isStarted;
         [ObservableProperty] private bool isSessionStarting;
@@ -184,7 +190,10 @@ namespace ScanOutTool.ViewModels
                 IsDataSending = true;
                 _loggingService.LogInformation($"Sending TRAY_COMPLETE to Cleber.MES: Mode={SelectedRunMode}, TrayId=<current open tray>");
 
-                CleberMesScanResult response = await _cleberMesService.SendTrayCompleteAsync(SelectedRunMode, string.Empty);
+                CleberMesScanResult response = await MeasureAsyncStep(
+                    "MESV2 TRAY_COMPLETE",
+                    "<current tray>",
+                    () => _cleberMesService.SendTrayCompleteAsync(SelectedRunMode, string.Empty));
                 ApplyCleberMesResult(response);
 
                 if (response.IsCompletedOk)
@@ -564,11 +573,14 @@ namespace ScanOutTool.ViewModels
             {
                 while (await reader.WaitToReadAsync(cancellationToken))
                 {
-                    while (reader.TryRead(out string? rawData))
+                    while (reader.TryRead(out QueuedScanItem queuedItem))
                     {
                         if (cancellationToken.IsCancellationRequested) return;
+                        string rawData = queuedItem.Data;
                         if (string.IsNullOrWhiteSpace(rawData)) continue;
 
+                        double queueWaitMs = Stopwatch.GetElapsedTime(queuedItem.EnqueuedTimestamp).TotalMilliseconds;
+                        _loggingService.LogInformation($"[Timing] Scan queue wait: PID={rawData}, ElapsedMs={queueWaitMs:0}");
                         _loggingService.LogInformation($"[Queue] Đang lấy mã từ hàng chờ ra xử lý: {rawData}");
                         await HandleScannerDataReceivedAsync(rawData);
                     }
@@ -607,7 +619,11 @@ namespace ScanOutTool.ViewModels
                 {
                     string rawData = e.Data.Trim();
                     _loggingService.LogInformation($"[Queue] Nhận dữ liệu từ scanner, đưa vào hàng chờ: {rawData}");
-                    _scanQueue.Writer.TryWrite(rawData);
+                    _scanQueue.Writer.TryWrite(new QueuedScanItem
+                    {
+                        Data = rawData,
+                        EnqueuedTimestamp = Stopwatch.GetTimestamp()
+                    });
                 }
             };
 
@@ -624,9 +640,10 @@ namespace ScanOutTool.ViewModels
         private async Task HandleScannerDataReceivedAsync(string data)
         {
             await _scanProcessingLock.WaitAsync();
+            string pid = data?.Trim() ?? string.Empty;
+            Stopwatch processingSw = Stopwatch.StartNew();
             try
             {
-                string pid = data?.Trim() ?? string.Empty;
                 ClearOperationMessages();
 
                 if (await TryHandleSpecialScannerDataAsync(data))
@@ -651,7 +668,6 @@ namespace ScanOutTool.ViewModels
                 {
                     _audioNotificationService.PlayBeep();
                 }
-                mainSW.Restart();
                 _loggingService.LogInformation($"[Event] Device gửi: {data}");
 
                 PID = pid;
@@ -680,9 +696,9 @@ namespace ScanOutTool.ViewModels
                     return;
                 }
 
-                _loggingService.LogInformation($"Check HMES block: {data}");
-                HmesBlockAction hmesBlockAction = CheckHmesBlock(pid);
-                if (hmesBlockAction == HmesBlockAction.StopBeforeShopFloor)
+                _loggingService.LogInformation($"Check QA block: {data}");
+                QaBlockAction qaBlockAction = await CheckQaBlockAsync(pid);
+                if (qaBlockAction == QaBlockAction.StopBeforeShopFloor)
                 {
                     return;
                 }
@@ -692,7 +708,16 @@ namespace ScanOutTool.ViewModels
                     return;
                 }
 
-                await _serialProxyManager.SendToAppAsync(data);
+                Stopwatch sendToShopFloorSw = Stopwatch.StartNew();
+                try
+                {
+                    await _serialProxyManager.SendToAppAsync(data);
+                }
+                finally
+                {
+                    _loggingService.LogInformation($"[Timing] Send PID to ShopFloor: PID={pid}, ElapsedMs={sendToShopFloorSw.ElapsedMilliseconds}");
+                }
+
                 await ProcessShopFloorResultAfterForwardAsync(data);
             }
             catch (Exception ex)
@@ -701,6 +726,7 @@ namespace ScanOutTool.ViewModels
             }
             finally
             {
+                _loggingService.LogInformation($"[Timing] Total scan processing: PID={pid}, ElapsedMs={processingSw.ElapsedMilliseconds}");
                 _scanProcessingLock.Release();
             }
         }
@@ -753,17 +779,16 @@ namespace ScanOutTool.ViewModels
                 _shouldClearShopFloorBeforeNextPid = false;
             }
 
-            _loggingService.LogInformation($"Check logic done {mainSW.ElapsedMilliseconds}");
-
             return false;
         }
 
         private async Task<bool> IsBlockedByRfAsync(string pid)
         {
+            Stopwatch sw = Stopwatch.StartNew();
             RFInfo rFInfo = await _blockRFService.IsBlock(pid);
+            _loggingService.LogInformation($"[Timing] RF block check: PID={pid}, ElapsedMs={sw.ElapsedMilliseconds}");
             if (rFInfo == null)
             {
-                _loggingService.LogInformation($"Check RF block done,{mainSW.ElapsedMilliseconds}ms");
                 return false;
             }
 
@@ -774,10 +799,11 @@ namespace ScanOutTool.ViewModels
 
         private async Task<bool> IsBlockedByXrayAsync(string pid)
         {
+            Stopwatch sw = Stopwatch.StartNew();
             XrayTraceResult xrayResult = await _xrayInspectionService.GetBlockingResultAsync(pid);
+            _loggingService.LogInformation($"[Timing] Xray block check: PID={pid}, ElapsedMs={sw.ElapsedMilliseconds}");
             if (xrayResult == null)
             {
-                _loggingService.LogInformation($"Check Xray block done,{mainSW.ElapsedMilliseconds}ms");
                 return false;
             }
 
@@ -786,24 +812,23 @@ namespace ScanOutTool.ViewModels
             return true;
         }
 
-        private HmesBlockAction CheckHmesBlock(string pid)
+        private async Task<QaBlockAction> CheckQaBlockAsync(string pid)
         {
-            var (isHSMESBlocked, reason) = _scanDataService.IsBlocked(pid);
+            var (isQaBlocked, reason) = await _scanDataService.IsBlockedAsync(pid);
 
-            if (!isHSMESBlocked)
+            if (!isQaBlocked)
             {
-                return HmesBlockAction.AllowFullFlow;
+                return QaBlockAction.AllowFullFlow;
             }
 
-
-            ShowHmesBlockedMessage(pid, reason);
-            _loggingService.LogWarning($"PID {pid} bị HMES block do {reason}");
-            return HmesBlockAction.StopBeforeShopFloor;
+            ShowQaBlockedMessage(pid, reason);
+            _loggingService.LogWarning($"PID {pid} bị QA block do {reason}");
+            return QaBlockAction.StopBeforeShopFloor;
         }
 
-        private void ShowHmesBlockedMessage(string pid, string reason)
+        private void ShowQaBlockedMessage(string pid, string reason)
         {
-            ShowWarningMessage($"[BLOCK HMES(QA)] PID {pid} đã bị block do {reason}, vui lòng kiểm tra lại");
+            ShowWarningMessage($"[BLOCK QA] PID {pid} đã bị block do {reason}, vui lòng kiểm tra lại");
         }
 
         private bool ClearShopFloorBeforeNextPidIfNeeded(string pid)
@@ -845,11 +870,21 @@ namespace ScanOutTool.ViewModels
             if (!_shopFloorService.IsScanoutUI()) return;
 
             ShopFloorScanResult scanResult = await ReadScanOutResult(sentData);
-            if (!scanResult.IsOk)
+            bool isWorkAlreadyFinished = IsWorkAlreadyFinishedResult(scanResult);
+            if (!scanResult.IsOk && !isWorkAlreadyFinished)
             {
                 _shouldClearShopFloorBeforeNextPid = true;
                 _loggingService.LogWarning($"ShopFloor NG for PID {sentData.Trim()}. CLEAR will be executed before next PID.");
                 return;
+            }
+
+            if (isWorkAlreadyFinished)
+            {
+                _shouldClearShopFloorBeforeNextPid = true;
+                _loggingService.LogWarning(
+                    $"ShopFloor NG accepted for MESV2: PID={scanResult.PID}, " +
+                    $"ShopFloorResult={scanResult.Result}, ShopFloorMessage='{scanResult.Message}', " +
+                    "MesV2Result=OK, MesV2Message=''. CLEAR will be executed before next PID.");
             }
 
             if (!IsInChooseEBRMode)
@@ -1074,9 +1109,12 @@ namespace ScanOutTool.ViewModels
         {
             try
             {
-                CleberMesScanResult status = string.IsNullOrWhiteSpace(pid)
-                    ? await _cleberMesService.GetStatusAsync()
-                    : await _cleberMesService.GetStatusAsync(pid);
+                CleberMesScanResult status = await MeasureAsyncStep(
+                    "MESV2 STATUS",
+                    string.IsNullOrWhiteSpace(pid) ? "<session>" : pid,
+                    () => string.IsNullOrWhiteSpace(pid)
+                        ? _cleberMesService.GetStatusAsync()
+                        : _cleberMesService.GetStatusAsync(pid));
                 ApplyCleberMesResult(status);
 
                 bool pidMatches = string.IsNullOrWhiteSpace(pid) ||
@@ -1152,7 +1190,10 @@ namespace ScanOutTool.ViewModels
                 item.LastRetryTime = DateTime.Now;
                 _loggingService.LogInformation($"[PendingScanout] Retrying PID '{item.PID}' with ScanOutOnly mode.");
 
-                CleberMesScanResult status = await _cleberMesService.GetStatusAsync(item.PID);
+                CleberMesScanResult status = await MeasureAsyncStep(
+                    "MESV2 pending STATUS",
+                    item.PID,
+                    () => _cleberMesService.GetStatusAsync(item.PID));
                 ApplyCleberMesResult(status);
                 if (!IsReadyForPid(status, item.PID))
                 {
@@ -1163,13 +1204,16 @@ namespace ScanOutTool.ViewModels
                     return false;
                 }
 
-                CleberMesScanResult response = await _cleberMesService.SendScanAsync(
-                    RunMode.ScanOutOnly,
+                CleberMesScanResult response = await MeasureAsyncStep(
+                    "MESV2 pending SCAN",
                     item.PID,
-                    item.WorkOrder,
-                    item.PartNo,
-                    string.Empty,
-                    string.Empty);
+                    () => _cleberMesService.SendScanAsync(
+                        RunMode.ScanOutOnly,
+                        item.PID,
+                        item.WorkOrder,
+                        item.PartNo,
+                        string.Empty,
+                        string.Empty));
 
                 ApplyCleberMesResult(response);
 
@@ -1178,6 +1222,7 @@ namespace ScanOutTool.ViewModels
                     _audioNotificationService.PlayOk();
                     RemovePendingScanout(item.PID);
                     _loggingService.LogInformation($"[PendingScanout] Retry OK. Removed PID '{item.PID}' from pending list. {CleberMesLogContext(response)}");
+                    await PushQaOutputAfterMesSuccessAsync(item.PID, item.WorkOrder, item.PartNo, response);
                     return true;
                 }
 
@@ -1303,15 +1348,34 @@ namespace ScanOutTool.ViewModels
             ResultMessage = scanResult.Message;
         }
 
+        private static bool IsWorkAlreadyFinishedResult(ShopFloorScanResult scanResult)
+        {
+            return scanResult != null &&
+                   string.Equals(scanResult.Result, "NG", StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(scanResult.Message?.Trim(), WorkAlreadyFinishedMessage, StringComparison.OrdinalIgnoreCase);
+        }
+
         private async Task<CleberMesScanResult> SendCleberMesScanAsync(string pid)
         {
             ClearOperationMessages();
-            _loggingService.LogInformation($"Sending PID '{pid}' to Cleber.MES: Mode={SelectedRunMode}, WorkOrder={WorkOrder}, PartNo={PartNo}, GMES={Result}");
+            bool isWorkAlreadyFinished =
+                string.Equals(Result, "NG", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(ResultMessage?.Trim(), WorkAlreadyFinishedMessage, StringComparison.OrdinalIgnoreCase);
+            string mesV2Result = isWorkAlreadyFinished ? "OK" : Result;
+            string mesV2Message = isWorkAlreadyFinished ? string.Empty : ResultMessage;
+
+            _loggingService.LogInformation(
+                $"Sending PID '{pid}' to Cleber.MES: Mode={SelectedRunMode}, WorkOrder={WorkOrder}, PartNo={PartNo}, " +
+                $"ShopFloorResult={Result}, ShopFloorMessage='{ResultMessage}', " +
+                $"MesV2Result={mesV2Result}, MesV2Message='{mesV2Message}'");
 
             CleberMesScanResult response;
             try
             {
-                CleberMesScanResult status = await _cleberMesService.GetStatusAsync(pid);
+                CleberMesScanResult status = await MeasureAsyncStep(
+                    "MESV2 STATUS",
+                    pid,
+                    () => _cleberMesService.GetStatusAsync(pid));
                 ApplyCleberMesResult(status);
                 if (!IsReadyForPid(status, pid))
                 {
@@ -1330,13 +1394,16 @@ namespace ScanOutTool.ViewModels
                     return status;
                 }
 
-                response = await _cleberMesService.SendScanAsync(
-                    SelectedRunMode,
+                response = await MeasureAsyncStep(
+                    "MESV2 SCAN",
                     pid,
-                    WorkOrder,
-                    PartNo,
-                    IsScanOutRescan ? Result : string.Empty,
-                    IsScanOutRescan ? ResultMessage : string.Empty);
+                    () => _cleberMesService.SendScanAsync(
+                        SelectedRunMode,
+                        pid,
+                        WorkOrder,
+                        PartNo,
+                        IsScanOutRescan ? mesV2Result : string.Empty,
+                        IsScanOutRescan ? mesV2Message : string.Empty));
             }
             catch (Exception ex)
             {
@@ -1366,6 +1433,7 @@ namespace ScanOutTool.ViewModels
                 }
 
                 _loggingService.LogInformation($"Cleber.MES OK: PID={pid}, Tray={response.TrayId}, Qty={response.CurrentQty}/{response.MaxQty}, Completed={response.Completed}, {CleberMesLogContext(response)}");
+                await PushQaOutputAfterMesSuccessAsync(pid, WorkOrder, PartNo, response);
             }
             else
             {
@@ -1395,7 +1463,10 @@ namespace ScanOutTool.ViewModels
             CleberMesScanResult response;
             try
             {
-                CleberMesScanResult status = await _cleberMesService.GetStatusAsync(pid);
+                CleberMesScanResult status = await MeasureAsyncStep(
+                    "MESV2 RescanOnly STATUS",
+                    pid,
+                    () => _cleberMesService.GetStatusAsync(pid));
                 ApplyCleberMesResult(status);
                 if (!IsReadyForPid(status, pid))
                 {
@@ -1404,7 +1475,10 @@ namespace ScanOutTool.ViewModels
                     return status;
                 }
 
-                response = await _cleberMesService.SendRescanOnlyAsync(pid);
+                response = await MeasureAsyncStep(
+                    "MESV2 RESCAN_ONLY",
+                    pid,
+                    () => _cleberMesService.SendRescanOnlyAsync(pid));
             }
             catch (Exception ex)
             {
@@ -1419,6 +1493,7 @@ namespace ScanOutTool.ViewModels
             {
                 _audioNotificationService.PlayOk();
                 _loggingService.LogInformation($"Cleber.MES RescanOnly OK: PID={pid}, Tray={response.TrayId}, Qty={response.CurrentQty}/{response.MaxQty}, Completed={response.Completed}, {CleberMesLogContext(response)}");
+                await PushQaOutputAfterMesSuccessAsync(pid, null, null, response);
             }
             else
             {
@@ -1426,6 +1501,40 @@ namespace ScanOutTool.ViewModels
             }
 
             return response;
+        }
+
+        private async Task PushQaOutputAfterMesSuccessAsync(
+            string pid,
+            string workOrder,
+            string partNo,
+            CleberMesScanResult mesResponse)
+        {
+            var item = new AvPidInoutDto
+            {
+                Pid = pid?.Trim() ?? string.Empty,
+                MachineId = null,
+                MachineName = string.IsNullOrWhiteSpace(_configService.Config.QaMachineName)
+                    ? null
+                    : _configService.Config.QaMachineName.Trim(),
+                OutputTime = DateTime.Now,
+                SlotNo = mesResponse?.CurrentQty > 0 ? mesResponse.CurrentQty : null,
+                PackNo = string.IsNullOrWhiteSpace(mesResponse?.TrayId) ? null : mesResponse.TrayId.Trim(),
+                Wo = string.IsNullOrWhiteSpace(workOrder) ? null : workOrder.Trim(),
+                Ebr = string.IsNullOrWhiteSpace(partNo) ? null : partNo.Trim()
+            };
+
+            try
+            {
+                PushResultDto result = await _scanDataService.PushAvPidOutputAsync(item);
+                if (!result.Success)
+                {
+                    _loggingService.LogWarning($"[QA Output] Server returned unsuccessful result after MESV2 OK. PID={item.Pid}, Message={result.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"[QA Output] Push failed after MESV2 OK. PID={item.Pid}, Error={ex.Message}");
+            }
         }
 
         private void ApplyCleberMesResult(CleberMesScanResult response)
@@ -1467,6 +1576,19 @@ namespace ScanOutTool.ViewModels
             }
 
             return await task;
+        }
+
+        private async Task<T> MeasureAsyncStep<T>(string step, string reference, Func<Task<T>> action)
+        {
+            Stopwatch sw = Stopwatch.StartNew();
+            try
+            {
+                return await action();
+            }
+            finally
+            {
+                _loggingService.LogInformation($"[Timing] {step}: Reference={reference}, ElapsedMs={sw.ElapsedMilliseconds}");
+            }
         }
 
         public class SerilogProxyLogger : IProxyLogger

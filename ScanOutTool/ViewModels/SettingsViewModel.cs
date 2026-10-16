@@ -26,6 +26,10 @@ namespace ScanOutTool.ViewModels
 
         [ObservableProperty] private string serverIP;
 
+        [ObservableProperty] private string qaBlockApiServer;
+
+        [ObservableProperty] private string qaMachineName;
+
         [ObservableProperty] private string xrayApiServer;
 
         [ObservableProperty] private string xrayApiPort;
@@ -44,6 +48,8 @@ namespace ScanOutTool.ViewModels
             _configService.Config.ScannerPortSettingVM = ScannerPortSettingVM;
             _configService.Config.ShopFloorPortSettingVM = ShopFloorPortSettingVM;
             _configService.Config.ServerIP = ServerIP;
+            _configService.Config.QaBlockApiServer = QaBlockApiServer;
+            _configService.Config.QaMachineName = QaMachineName;
             _configService.Config.XrayApiServer = XrayApiServer;
             _configService.Config.XrayApiPort = XrayApiPort;
             _configService.Config.IsWOMode = IsWOMode;
@@ -97,6 +103,10 @@ namespace ScanOutTool.ViewModels
             IsWOMode = _configService.Config.IsWOMode;
             BeepOnScanReceived = _configService.Config.BeepOnScanReceived;
             ServerIP = _configService.Config.ServerIP;
+            QaBlockApiServer = string.IsNullOrWhiteSpace(_configService.Config.QaBlockApiServer)
+                ? "http://10.7.10.6:9999"
+                : _configService.Config.QaBlockApiServer;
+            QaMachineName = _configService.Config.QaMachineName ?? string.Empty;
             XrayApiServer = _configService.Config.XrayApiServer;
             XrayApiPort = _configService.Config.XrayApiPort;
             ShopFloorExePath = _configService.Config.ShopFloorExePath;
